@@ -1,0 +1,8 @@
+node_modules/
+dist/
+data/gtd.db
+data/pending-commands/*.json
+data/results/*.json
+.env
+data/gtd.db-shm
+data/gtd.db-wal
