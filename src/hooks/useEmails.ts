@@ -46,7 +46,12 @@ export function useMessages(folderId: string | null) {
 
   useEffect(() => { load() }, [load])
 
-  return { messages, loading, refresh: load }
+  // Remove a message from the local array (after delete/move/etc)
+  const removeMessage = useCallback((messageId: string) => {
+    setMessages(prev => prev.filter(m => m.id !== messageId))
+  }, [])
+
+  return { messages, loading, refresh: load, removeMessage }
 }
 
 export function useFullMessage(messageId: string | null) {

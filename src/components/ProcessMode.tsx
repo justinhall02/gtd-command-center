@@ -27,7 +27,7 @@ export default function ProcessMode({ initialFolderId }: Props) {
   const { lists } = useTodoLists()
   const [selectedFolder, setSelectedFolder] = useState<string | null>(initialFolderId || null)
   const [allFolders, setAllFolders] = useState<MailFolder[]>([])
-  const { messages, loading: msgsLoading, refresh } = useMessages(selectedFolder)
+  const { messages, loading: msgsLoading, refresh, removeMessage } = useMessages(selectedFolder)
   const [currentIndex, setCurrentIndex] = useState(0)
   const [showTaskForm, setShowTaskForm] = useState(false)
   const [showMoveMenu, setShowMoveMenu] = useState(false)
@@ -90,69 +90,85 @@ export default function ProcessMode({ initialFolderId }: Props) {
 
   const currentEmail = messages[currentIndex]
 
-  const advanceToNext = useCallback(() => {
+  // Reset UI panels (used after every action)
+  const resetPanels = useCallback(() => {
     setShowTaskForm(false)
     setShowMoveMenu(false)
     setShowMisrouteMenu(false)
     setSuggestion(null)
+  }, [])
+
+  // Remove email from list after delete/move/misroute/coro/quote
+  // The next email slides into the same index position automatically.
+  // If we were at the end, clamp back.
+  const removeAndAdvance = useCallback((emailId: string) => {
+    resetPanels()
+    removeMessage(emailId)
+    // If we're at or past the new end, clamp index
+    setCurrentIndex(i => {
+      const newLength = messages.length - 1
+      if (newLength <= 0) return 0
+      return i >= newLength ? newLength - 1 : i
+    })
+  }, [messages.length, removeMessage, resetPanels])
+
+  const handleDelete = async () => {
+    if (!currentEmail) return
+    const id = currentEmail.id
+    await processMessage(id, 'delete', undefined, {
+      from: currentEmail.from.emailAddress.address,
+      subject: currentEmail.subject,
+      hasAttachments: currentEmail.hasAttachments,
+    })
+    removeAndAdvance(id)
+  }
+
+  const handleSkip = () => {
+    resetPanels()
     if (currentIndex < messages.length - 1) {
       setCurrentIndex(i => i + 1)
     } else {
       refresh()
       setCurrentIndex(0)
     }
-  }, [currentIndex, messages.length, refresh])
-
-  const handleDelete = async () => {
-    if (!currentEmail) return
-    await processMessage(currentEmail.id, 'delete', undefined, {
-      from: currentEmail.from.emailAddress.address,
-      subject: currentEmail.subject,
-      hasAttachments: currentEmail.hasAttachments,
-    })
-    advanceToNext()
-  }
-
-  const handleSkip = () => {
-    advanceToNext()
   }
 
   const handleMove = async (folderId: string, folderName: string) => {
     if (!currentEmail) return
-    await moveMessage(currentEmail.id, folderId, folderName)
-    await processMessage(currentEmail.id, 'moved', folderName, {
+    const id = currentEmail.id
+    await moveMessage(id, folderId, folderName)
+    await processMessage(id, 'moved', folderName, {
       from: currentEmail.from.emailAddress.address,
       subject: currentEmail.subject,
       hasAttachments: currentEmail.hasAttachments,
     })
-    setShowMoveMenu(false)
-    advanceToNext()
+    removeAndAdvance(id)
   }
 
   const handleMisroute = async (folderId: string, folderName: string) => {
     if (!currentEmail) return
-    // Find what folder this email is currently in
+    const id = currentEmail.id
     const currentFolderName = allFolders.find(f => f.id === selectedFolder)?.displayName || 'unknown'
-    await moveMessage(currentEmail.id, folderId, folderName)
-    await processMessage(currentEmail.id, 'misrouted', folderName, {
+    await moveMessage(id, folderId, folderName)
+    await processMessage(id, 'misrouted', folderName, {
       from: currentEmail.from.emailAddress.address,
       subject: currentEmail.subject,
       hasAttachments: currentEmail.hasAttachments,
       folder: currentFolderName,
       correctedTo: folderName,
     })
-    setShowMisrouteMenu(false)
-    advanceToNext()
+    removeAndAdvance(id)
   }
 
   const handleReportCoro = async () => {
     if (!currentEmail) return
-    await reportToCoro(currentEmail.id, 'suspicious', {
+    const id = currentEmail.id
+    await reportToCoro(id, 'suspicious', {
       from: currentEmail.from.emailAddress.address,
       subject: currentEmail.subject,
       hasAttachments: currentEmail.hasAttachments,
     })
-    advanceToNext()
+    removeAndAdvance(id)
   }
 
   // Detect quote-related emails
@@ -163,7 +179,7 @@ export default function ProcessMode({ initialFolderId }: Props) {
 
   const handleQuoteIt = async () => {
     if (!currentEmail) return
-    // Queue a command for Claude Code to run /create-quote
+    const id = currentEmail.id
     const res = await fetch('/api/tasks', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -173,11 +189,11 @@ export default function ProcessMode({ initialFolderId }: Props) {
         claude_type: 'autonomous',
         claude_action: JSON.stringify({
           skill: '/create-quote',
-          source_email: currentEmail.id,
+          source_email: id,
           from: currentEmail.from.emailAddress.address,
           subject: currentEmail.subject,
         }),
-        source_email_id: currentEmail.id,
+        source_email_id: id,
         source_email_subject: currentEmail.subject,
         source_email_from: currentEmail.from.emailAddress.address,
         emailMeta: {
@@ -188,9 +204,8 @@ export default function ProcessMode({ initialFolderId }: Props) {
       }),
     })
     const task = await res.json()
-    // Immediately queue for execution
     await fetch(`/api/tasks/${task.id}/queue`, { method: 'POST' })
-    advanceToNext()
+    removeAndAdvance(id)
   }
 
   // Keyboard shortcuts
@@ -275,7 +290,7 @@ export default function ProcessMode({ initialFolderId }: Props) {
             <TaskForm
               email={currentEmail}
               lists={lists}
-              onSaved={advanceToNext}
+              onSaved={() => removeAndAdvance(currentEmail.id)}
               onCancel={() => setShowTaskForm(false)}
             />
           )}
