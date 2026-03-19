@@ -1,4 +1,5 @@
 import { Router } from 'express'
+import fs from 'fs'
 import { listPendingCommands, getResult, isSessionActive, launchSession } from '../services/claude.js'
 import { getPatterns, getFolderUsageRanking, getMisroutePatterns } from '../services/decisions.js'
 import db from '../db.js'
@@ -89,13 +90,11 @@ router.post('/session/start', (_req, res) => {
 // Stop/reset the session (clears lock, resets in_progress tasks to pending)
 router.post('/session/stop', (_req, res) => {
   try {
-    // Clear lock file
     const lockFile = '/tmp/gtd-session-active.lock'
-    const fs = require('fs')
-    if (fs.existsSync(lockFile)) fs.unlinkSync(lockFile)
+    try { fs.unlinkSync(lockFile) } catch {}
 
-    // Reset in_progress tasks back to pending
     const result = db.prepare("UPDATE tasks SET status = 'pending' WHERE status = 'in_progress'").run()
+    console.log(`[SESSION] Stopped — ${result.changes} tasks reset to pending`)
 
     res.json({ ok: true, tasksReset: result.changes })
   } catch (err: any) {

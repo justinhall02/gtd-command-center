@@ -169,13 +169,26 @@ export function launchSession(tasks: TaskForSession[]): { promptFile: string } {
     taskIds: tasks.map(t => t.id),
   }))
 
-  // Write a launcher script — avoids all shell escaping nightmares
+  // Write a launcher script — sources nvm for node, avoids shell escaping nightmares
   const launcherScript = '/tmp/gtd-launch-session.sh'
+  const NVM_DIR = '/home/justin/.nvm'
   const CLAUDE_BIN = '/home/justin/.nvm/versions/node/v20.19.4/bin/claude'
   fs.writeFileSync(launcherScript, `#!/bin/bash
+# Source nvm so node is on PATH (claude needs it)
+export NVM_DIR="${NVM_DIR}"
+[ -s "$NVM_DIR/nvm.sh" ] && . "$NVM_DIR/nvm.sh"
+
 cd /mnt/c/Users/JustinHall/gtd-command-center
 SYSTEM_PROMPT=$(cat ${promptFile})
 INITIAL_PROMPT=$(cat ${initialPromptFile})
+
+# Clean up lock file when session ends (user closes terminal or claude exits)
+cleanup() {
+  rm -f ${SESSION_LOCK_FILE}
+  curl -s -X POST http://localhost:3456/api/execute/session/stop > /dev/null 2>&1
+}
+trap cleanup EXIT
+
 exec ${CLAUDE_BIN} --dangerously-skip-permissions --chrome --name "GTD Execute Session" --system-prompt "$SYSTEM_PROMPT" "$INITIAL_PROMPT"
 `, { mode: 0o755 })
 
