@@ -19,10 +19,11 @@ export default function ExecuteMode() {
     })
   }
 
-  // Filter tasks by selected lists (or show all if none selected)
+  // Filter tasks by selected lists. Show ALL when none selected.
   const filteredTasks = useMemo(() => {
     if (selectedLists.size === 0) return tasks
-    return tasks.filter(t => t.m365_list_id && selectedLists.has(t.m365_list_id))
+    // Include tasks matching selected lists OR tasks with no list (local-only)
+    return tasks.filter(t => !t.m365_list_id || selectedLists.has(t.m365_list_id))
   }, [tasks, selectedLists])
 
   const grouped = useMemo(() => ({
