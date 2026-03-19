@@ -1,6 +1,7 @@
 import { Router } from 'express'
-import { listPendingCommands, getResult } from '../services/claude.js'
+import { listPendingCommands, getResult, isSessionActive, launchSession } from '../services/claude.js'
 import { getPatterns, getFolderUsageRanking, getMisroutePatterns } from '../services/decisions.js'
+import db from '../db.js'
 
 const router = Router()
 
@@ -49,6 +50,37 @@ router.get('/misroute-patterns', (_req, res) => {
   try {
     const patterns = getMisroutePatterns()
     res.json(patterns)
+  } catch (err: any) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// Check if a Claude session is currently running
+router.get('/session', (_req, res) => {
+  res.json({ active: isSessionActive() })
+})
+
+// Launch a Claude Code session with all pending tasks
+router.post('/session/start', (_req, res) => {
+  try {
+    if (isSessionActive()) {
+      return res.status(409).json({ error: 'A session is already running' })
+    }
+
+    // Get all pending/in_progress tasks
+    const tasks = db.prepare(`
+      SELECT id, title, claude_type, body, source_email_from, source_email_subject, claude_action
+      FROM tasks
+      WHERE status IN ('pending', 'in_progress')
+      ORDER BY created_at ASC
+    `).all() as any[]
+
+    if (tasks.length === 0) {
+      return res.status(400).json({ error: 'No pending tasks to execute' })
+    }
+
+    const result = launchSession(tasks)
+    res.json({ ok: true, taskCount: tasks.length, promptFile: result.promptFile })
   } catch (err: any) {
     res.status(500).json({ error: err.message })
   }

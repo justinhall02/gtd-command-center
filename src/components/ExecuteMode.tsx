@@ -1,14 +1,31 @@
-import { useState, useMemo } from 'react'
-import { useTodoLists, useTasks, queueTaskExecution, updateTask, deleteTask } from '../hooks/useTasks'
+import { useState, useMemo, useEffect } from 'react'
+import { useTodoLists, useTasks, updateTask, deleteTask } from '../hooks/useTasks'
 import ListPicker from './ListPicker'
-import TaskCard from './TaskCard'
+import TaskKanbanCard from './TaskKanbanCard'
 import type { Task } from '../types'
 
 export default function ExecuteMode() {
   const { lists } = useTodoLists()
   const { tasks, loading, refresh } = useTasks()
   const [selectedLists, setSelectedLists] = useState<Set<string>>(new Set())
-  const [executionLog, setExecutionLog] = useState<Array<{ time: string; message: string; status: string }>>([])
+  const [sessionActive, setSessionActive] = useState(false)
+  const [launching, setLaunching] = useState(false)
+
+  // Poll session status
+  useEffect(() => {
+    const check = () => {
+      fetch('/api/execute/session').then(r => r.json()).then(d => setSessionActive(d.active)).catch(() => {})
+    }
+    check()
+    const interval = setInterval(check, 5000)
+    return () => clearInterval(interval)
+  }, [])
+
+  // Auto-refresh tasks every 3s to catch completions from Claude session
+  useEffect(() => {
+    const interval = setInterval(refresh, 3000)
+    return () => clearInterval(interval)
+  }, [refresh])
 
   const toggleList = (listId: string) => {
     setSelectedLists(prev => {
@@ -19,51 +36,42 @@ export default function ExecuteMode() {
     })
   }
 
-  // Filter tasks by selected lists. Show ALL when none selected.
   const filteredTasks = useMemo(() => {
     if (selectedLists.size === 0) return tasks
-    // Include tasks matching selected lists OR tasks with no list (local-only)
     return tasks.filter(t => !t.m365_list_id || selectedLists.has(t.m365_list_id))
   }, [tasks, selectedLists])
 
-  const grouped = useMemo(() => ({
-    autonomous: filteredTasks.filter(t => t.claude_type === 'autonomous' && t.status !== 'completed'),
-    guided: filteredTasks.filter(t => t.claude_type === 'guided' && t.status !== 'completed'),
-    manual: filteredTasks.filter(t => t.claude_type === 'manual' && t.status !== 'completed'),
-    completed: filteredTasks.filter(t => t.status === 'completed'),
+  const columns = useMemo(() => ({
+    pending: filteredTasks.filter(t => t.status === 'pending'),
+    in_progress: filteredTasks.filter(t => t.status === 'in_progress'),
+    done: filteredTasks.filter(t => t.status === 'completed').slice(0, 10),
   }), [filteredTasks])
 
-  const handleExecute = async (task: Task) => {
+  const handleStartSession = async () => {
+    setLaunching(true)
     try {
-      await queueTaskExecution(task.id)
-      setExecutionLog(prev => [{
-        time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-        message: `Queued "${task.title}"`,
-        status: 'pending',
-      }, ...prev])
-      refresh()
+      const res = await fetch('/api/execute/session/start', { method: 'POST' })
+      const data = await res.json()
+      if (data.ok) {
+        setSessionActive(true)
+        refresh()
+      } else {
+        alert(data.error || 'Failed to start session')
+      }
     } catch (err) {
       console.error(err)
+    } finally {
+      setLaunching(false)
     }
-  }
-
-  const handleComplete = async (task: Task) => {
-    await updateTask(task.id, { status: 'completed' } as any)
-    setExecutionLog(prev => [{
-      time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-      message: `Completed "${task.title}"`,
-      status: 'done',
-    }, ...prev])
-    refresh()
   }
 
   const handleDismiss = async (task: Task) => {
     await deleteTask(task.id)
-    setExecutionLog(prev => [{
-      time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
-      message: `Dismissed "${task.title}"`,
-      status: 'dismissed',
-    }, ...prev])
+    refresh()
+  }
+
+  const handleComplete = async (task: Task) => {
+    await updateTask(task.id, { status: 'completed' } as any)
     refresh()
   }
 
@@ -73,84 +81,100 @@ export default function ExecuteMode() {
 
   return (
     <div>
-      {/* List picker */}
-      <div className="mb-6">
-        <div className="text-text-dim text-xs mb-2">Pull from lists:</div>
-        <ListPicker lists={lists} selected={selectedLists} onToggle={toggleList} />
+      {/* List picker + Start Session */}
+      <div className="flex items-start justify-between gap-4 mb-6">
+        <div className="flex-1">
+          <div className="text-text-dim text-xs mb-2">Pull from lists:</div>
+          <ListPicker lists={lists} selected={selectedLists} onToggle={toggleList} />
+        </div>
+        <button
+          onClick={handleStartSession}
+          disabled={launching || sessionActive || columns.pending.length === 0}
+          className={`px-6 py-3 text-sm font-bold tracking-wider transition-colors flex-shrink-0 ${
+            sessionActive
+              ? 'bg-warning/20 text-warning border border-warning/40 cursor-not-allowed'
+              : launching
+              ? 'bg-accent/50 text-bg cursor-wait'
+              : columns.pending.length === 0
+              ? 'bg-surface text-text-dim border border-border cursor-not-allowed'
+              : 'bg-accent text-bg hover:bg-accent-dim'
+          }`}
+        >
+          {sessionActive ? 'SESSION RUNNING...' : launching ? 'LAUNCHING...' : `START SESSION (${columns.pending.length})`}
+        </button>
       </div>
+
+      {/* Session active banner */}
+      {sessionActive && (
+        <div className="mb-4 px-4 py-2 border border-warning/40 bg-warning/5 text-xs flex items-center gap-2">
+          <span className="text-warning animate-pulse">●</span>
+          <span className="text-text">Claude is working in Windows Terminal — switch to it to interact</span>
+        </div>
+      )}
 
       {/* No tasks */}
       {filteredTasks.length === 0 && (
         <div className="text-text-dim text-xs py-8 text-center border border-border bg-surface">
-          No tasks yet. Switch to Process mode to triage emails into tasks.
+          No tasks yet. Switch to Inbox to triage emails into tasks.
         </div>
       )}
 
-      {/* Claude Can Do */}
-      {grouped.autonomous.length > 0 && (
-        <div className="mb-6">
-          <div className="text-accent text-xs font-medium tracking-wider mb-2 flex items-center gap-2">
-            <span className="text-accent">──</span>
-            CLAUDE CAN DO ({grouped.autonomous.length})
-            <span className="flex-1 border-t border-border" />
-          </div>
-          <div className="flex flex-col gap-px bg-border">
-            {grouped.autonomous.map(t => (
-              <TaskCard key={t.id} task={t} onExecute={() => handleExecute(t)} onComplete={() => handleComplete(t)} onDismiss={() => handleDismiss(t)} />
+      {/* Kanban board */}
+      {filteredTasks.length > 0 && (
+        <div className="grid grid-cols-3 gap-4">
+          {/* PENDING column */}
+          <div>
+            <div className="text-text-dim text-xs font-medium tracking-wider mb-3 flex items-center gap-2 pb-2 border-b border-border">
+              PENDING
+              <span className="text-accent">({columns.pending.length})</span>
+            </div>
+            {columns.pending.length === 0 && (
+              <div className="text-text-dim text-xs py-4 text-center opacity-50">No pending tasks</div>
+            )}
+            {columns.pending.map(t => (
+              <TaskKanbanCard
+                key={t.id}
+                task={t}
+                column="pending"
+                onDismiss={() => handleDismiss(t)}
+              />
             ))}
           </div>
-        </div>
-      )}
 
-      {/* Claude Guided */}
-      {grouped.guided.length > 0 && (
-        <div className="mb-6">
-          <div className="text-warning text-xs font-medium tracking-wider mb-2 flex items-center gap-2">
-            <span>──</span>
-            CLAUDE GUIDED ({grouped.guided.length})
-            <span className="flex-1 border-t border-border" />
-          </div>
-          <div className="flex flex-col gap-px bg-border">
-            {grouped.guided.map(t => (
-              <TaskCard key={t.id} task={t} onExecute={() => handleExecute(t)} onComplete={() => handleComplete(t)} onDismiss={() => handleDismiss(t)} />
+          {/* IN PROGRESS column */}
+          <div>
+            <div className="text-accent text-xs font-medium tracking-wider mb-3 flex items-center gap-2 pb-2 border-b border-accent/30">
+              IN PROGRESS
+              <span>({columns.in_progress.length})</span>
+            </div>
+            {columns.in_progress.length === 0 && (
+              <div className="text-text-dim text-xs py-4 text-center opacity-50">Nothing running</div>
+            )}
+            {columns.in_progress.map(t => (
+              <TaskKanbanCard
+                key={t.id}
+                task={t}
+                column="in_progress"
+                onComplete={() => handleComplete(t)}
+              />
             ))}
           </div>
-        </div>
-      )}
 
-      {/* Manual */}
-      {grouped.manual.length > 0 && (
-        <div className="mb-6">
-          <div className="text-text-dim text-xs font-medium tracking-wider mb-2 flex items-center gap-2">
-            <span>──</span>
-            MANUAL ({grouped.manual.length})
-            <span className="flex-1 border-t border-border" />
-          </div>
-          <div className="flex flex-col gap-px bg-border">
-            {grouped.manual.map(t => (
-              <TaskCard key={t.id} task={t} onExecute={() => handleExecute(t)} onComplete={() => handleComplete(t)} onDismiss={() => handleDismiss(t)} />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Execution log */}
-      {executionLog.length > 0 && (
-        <div className="mt-8">
-          <div className="text-text-dim text-xs font-medium tracking-wider mb-2 flex items-center gap-2">
-            <span>──</span>
-            EXECUTION LOG
-            <span className="flex-1 border-t border-border" />
-          </div>
-          <div className="border border-border bg-surface">
-            {executionLog.map((entry, i) => (
-              <div key={i} className="px-4 py-2 text-xs border-b border-border last:border-b-0 flex items-center gap-3">
-                <span className="text-text-dim">{entry.time}</span>
-                <span className="text-text">{entry.message}</span>
-                <span className={entry.status === 'done' ? 'text-success' : 'text-warning'}>
-                  {entry.status === 'done' ? '✓' : '...'}
-                </span>
-              </div>
+          {/* DONE column */}
+          <div>
+            <div className="text-success text-xs font-medium tracking-wider mb-3 flex items-center gap-2 pb-2 border-b border-success/30">
+              DONE
+              <span>({columns.done.length})</span>
+            </div>
+            {columns.done.length === 0 && (
+              <div className="text-text-dim text-xs py-4 text-center opacity-50">Nothing done yet</div>
+            )}
+            {columns.done.map(t => (
+              <TaskKanbanCard
+                key={t.id}
+                task={t}
+                column="done"
+              />
             ))}
           </div>
         </div>
