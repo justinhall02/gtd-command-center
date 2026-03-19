@@ -97,11 +97,11 @@ export async function processMessage(messageId: string, action: string, destinat
   return res.json()
 }
 
-export async function reportToCoro(messageId: string, reportAction: string, emailMeta?: any) {
-  const res = await fetch(`${API}/messages/${messageId}/report-coro`, {
+export async function reportSpam(messageId: string, reportAction: 'junk' | 'phish', emailMeta?: any) {
+  const res = await fetch(`${API}/messages/${messageId}/report-spam`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action: reportAction, emailMeta }),
+    body: JSON.stringify({ reportAction, emailMeta }),
   })
   return res.json()
 }

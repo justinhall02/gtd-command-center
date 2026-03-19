@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import type { MailFolder, Suggestion } from '../types'
-import { useFolders, useMessages, processMessage, moveMessage, reportToCoro } from '../hooks/useEmails'
+import { useFolders, useMessages, processMessage, moveMessage, reportSpam } from '../hooks/useEmails'
 import { useTodoLists } from '../hooks/useTasks'
 import FolderPicker from './FolderPicker'
 import EmailCard from './EmailCard'
@@ -98,7 +98,7 @@ export default function ProcessMode({ initialFolderId }: Props) {
     setSuggestion(null)
   }, [])
 
-  // Remove email from list after delete/move/misroute/coro/quote
+  // Remove email from list after delete/move/misroute/report/quote
   // When we remove an email, the array shrinks. If we're at the last item,
   // we need to go back one. Otherwise the same index now points to the next email.
   const removeAndAdvance = useCallback((emailId: string) => {
@@ -160,10 +160,21 @@ export default function ProcessMode({ initialFolderId }: Props) {
     removeAndAdvance(id)
   }
 
-  const handleReportCoro = async () => {
+  const handleReportSpam = async () => {
     if (!currentEmail) return
     const id = currentEmail.id
-    await reportToCoro(id, 'suspicious', {
+    await reportSpam(id, 'junk', {
+      from: currentEmail.from.emailAddress.address,
+      subject: currentEmail.subject,
+      hasAttachments: currentEmail.hasAttachments,
+    })
+    removeAndAdvance(id)
+  }
+
+  const handleReportPhishing = async () => {
+    if (!currentEmail) return
+    const id = currentEmail.id
+    await reportSpam(id, 'phish', {
       from: currentEmail.from.emailAddress.address,
       subject: currentEmail.subject,
       hasAttachments: currentEmail.hasAttachments,
@@ -216,7 +227,8 @@ export default function ProcessMode({ initialFolderId }: Props) {
       if (e.key === 't' || e.key === 'T') { e.preventDefault(); setShowTaskForm(true) }
       if (e.key === 'm' || e.key === 'M') { e.preventDefault(); setShowMoveMenu(!showMoveMenu); setShowMisrouteMenu(false) }
       if (e.key === 'r' || e.key === 'R') { e.preventDefault(); setShowMisrouteMenu(!showMisrouteMenu); setShowMoveMenu(false) }
-      if (e.key === 'c' || e.key === 'C') { e.preventDefault(); handleReportCoro() }
+      if (e.key === 's' || e.key === 'S') { e.preventDefault(); handleReportSpam() }
+      if (e.key === 'p' || e.key === 'P') { e.preventDefault(); handleReportPhishing() }
       if (e.key === 'd' || e.key === 'D') { e.preventDefault(); handleDelete() }
       if (e.key === 'ArrowRight' || e.key === 'j') { e.preventDefault(); handleSkip() }
     }
@@ -278,7 +290,8 @@ export default function ProcessMode({ initialFolderId }: Props) {
             onAddTask={() => setShowTaskForm(true)}
             onMove={() => { setShowMoveMenu(!showMoveMenu); setShowMisrouteMenu(false) }}
             onMisrouted={() => { setShowMisrouteMenu(!showMisrouteMenu); setShowMoveMenu(false) }}
-            onReportCoro={handleReportCoro}
+            onReportSpam={handleReportSpam}
+            onReportPhishing={handleReportPhishing}
             onQuoteIt={handleQuoteIt}
             onArchive={handleDelete}
             onSkip={handleSkip}
@@ -358,7 +371,7 @@ export default function ProcessMode({ initialFolderId }: Props) {
 
       {/* Keyboard shortcut hint */}
       <div className="mt-6 text-center text-text-dim text-xs opacity-50">
-        [Q] quote it · [T] add task · [M] move · [R] misrouted · [C] coro · [D] delete · [→] skip
+        [Q] quote it · [T] add task · [M] move · [R] misrouted · [S] spam · [P] phishing · [D] delete · [→] skip
       </div>
     </div>
   )

@@ -10,7 +10,8 @@ interface Props {
   onAddTask: () => void
   onMove: () => void
   onMisrouted: () => void
-  onReportCoro: () => void
+  onReportSpam: () => void
+  onReportPhishing: () => void
   onQuoteIt: () => void
   onArchive: () => void
   onSkip: () => void
@@ -60,7 +61,7 @@ function timeAgo(dateStr: string): string {
   return `${days}d ago`
 }
 
-export default function EmailCard({ email, suggestion, index, total, onAddTask, onMove, onMisrouted, onReportCoro, onQuoteIt, onArchive, onSkip, isQuoteEmail }: Props) {
+export default function EmailCard({ email, suggestion, index, total, onAddTask, onMove, onMisrouted, onReportSpam, onReportPhishing, onQuoteIt, onArchive, onSkip, isQuoteEmail }: Props) {
   const [expanded, setExpanded] = useState(false)
   const { message: fullMessage } = useFullMessage(expanded ? email.id : null)
   const emailBodyRef = useRef<HTMLDivElement>(null)
@@ -165,10 +166,16 @@ export default function EmailCard({ email, suggestion, index, total, onAddTask, 
           [R] Misrouted
         </button>
         <button
-          onClick={onReportCoro}
+          onClick={onReportSpam}
           className="px-3 py-1.5 text-xs font-medium border border-warning/40 text-warning hover:bg-warning/10 transition-colors"
         >
-          [C] Coro
+          [S] Spam
+        </button>
+        <button
+          onClick={onReportPhishing}
+          className="px-3 py-1.5 text-xs font-medium border border-danger/40 text-danger hover:bg-danger/10 transition-colors"
+        >
+          [P] Phishing
         </button>
         <button
           onClick={onArchive}

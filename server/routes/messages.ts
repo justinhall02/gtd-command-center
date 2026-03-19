@@ -87,37 +87,30 @@ router.post('/:id/process', async (req, res) => {
   }
 })
 
-// Report to Coro (forward email as phishing/spam report)
-const CORO_REPORT_ADDRESS = process.env.CORO_REPORT_ADDRESS || 'report@coro.net'
-
-router.post('/:id/report-coro', async (req, res) => {
+// Report message as spam or phishing to Microsoft Defender (trains EOP filter)
+router.post('/:id/report-spam', async (req, res) => {
   try {
-    const { action: reportAction, emailMeta } = req.body
-    const comment = `Reported as ${reportAction || 'suspicious'} via GTD Command Center`
+    const { reportAction, emailMeta } = req.body
+    const action = reportAction === 'phish' ? 'phish' : 'junk'
 
-    // Forward email to Coro for analysis
-    await graph.forwardMessage(req.params.id, CORO_REPORT_ADDRESS, comment)
-
-    // Move to Deleted Items after reporting
-    const folders = await graph.listFolders()
-    const trash = folders.find((f: any) => f.displayName === 'Deleted Items')
-    if (trash) {
-      await graph.moveMessage(req.params.id, trash.id)
-    }
+    console.log(`[REPORT] Reporting message ${req.params.id.slice(0, 30)}... as ${action}`)
+    await graph.reportMessage(req.params.id, action)
+    console.log(`[REPORT] Success — reported as ${action}, message moved by Defender`)
 
     // Record in processed emails
     db.prepare(`
       INSERT OR REPLACE INTO processed_emails (email_id, action, destination)
-      VALUES (?, 'reported_coro', ?)
-    `).run(req.params.id, CORO_REPORT_ADDRESS)
+      VALUES (?, ?, ?)
+    `).run(req.params.id, `reported_${action}`, action === 'phish' ? 'Deleted Items' : 'Junk Email')
 
     // Record decision for learning
     if (emailMeta) {
-      recordDecision('process', emailMeta, `report_coro:${reportAction || 'suspicious'}`)
+      recordDecision('process', emailMeta, `report_${action}`)
     }
 
-    res.json({ ok: true, reportedTo: CORO_REPORT_ADDRESS })
+    res.json({ ok: true, reportedAs: action })
   } catch (err: any) {
+    console.error(`[REPORT] FAILED:`, err.message)
     res.status(500).json({ error: err.message })
   }
 })

@@ -156,4 +156,28 @@ export const graph = {
       }),
     })
   },
+
+  // Report message as junk/phishing to Microsoft Defender (trains EOP spam filter)
+  // NOTE: reportMessage is a BETA endpoint — must use graph.microsoft.com/beta, not v1.0
+  async reportMessage(messageId: string, action: 'junk' | 'phish' | 'notJunk') {
+    const token = await getAccessToken()
+    const res = await fetch(`https://graph.microsoft.com/beta/me/messages/${messageId}/reportMessage`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        isMessageMoveRequested: true,
+        reportAction: action,
+      }),
+    })
+    if (!res.ok) {
+      const errorBody = await res.text()
+      throw new Error(`Graph API beta ${res.status}: ${errorBody}`)
+    }
+    const contentType = res.headers.get('content-type')
+    if (contentType?.includes('application/json')) return res.json()
+    return res.text()
+  },
 }
