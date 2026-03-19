@@ -44,34 +44,44 @@ export default function EmailCard({ email, suggestion, index, total, onAddTask, 
 
   return (
     <div className="border border-border bg-surface">
-      {/* Header */}
+      {/* Header — always visible, with minimize button when expanded */}
       <div className="px-4 py-3 border-b border-border flex items-center justify-between">
         <span className="text-text-dim text-xs">
           Email {index + 1} of {total}
         </span>
-        {email.hasAttachments && (
-          <span className="text-warning text-xs">+ attachments</span>
-        )}
+        <div className="flex items-center gap-3">
+          {email.hasAttachments && (
+            <span className="text-warning text-xs">+ attachments</span>
+          )}
+          {expanded && (
+            <button
+              onClick={() => setExpanded(false)}
+              className="text-accent text-xs hover:text-accent-dim transition-colors"
+            >
+              ▴ minimize
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Email content */}
       <div className="px-4 py-4">
+        {/* Summary — always visible */}
         <div className="flex items-start justify-between mb-1">
           <span className="text-accent text-xs">{email.from.emailAddress.address}</span>
           <span className="text-text-dim text-xs">{timeAgo(email.receivedDateTime)}</span>
         </div>
         <h3 className="text-text font-medium text-sm mb-2">{email.subject}</h3>
-        {!expanded && (
-          <p className="text-text/70 text-xs leading-relaxed">
-            {email.bodyPreview}
-          </p>
-        )}
+        <p className="text-text/70 text-xs leading-relaxed">
+          {email.bodyPreview}
+        </p>
 
-        {/* Expanded full email — no scroll cap, force light text over email's dark inline styles */}
+        {/* Expanded email body — fills available viewport height, scrollable */}
         {expanded && fullMessage?.body && (
           <div
             ref={emailBodyRef}
-            className="mt-3 pt-3 border-t border-border text-sm leading-relaxed [&_a]:text-accent [&_a]:underline [&_*]:!text-text/80 [&_h1]:!text-text [&_h2]:!text-text [&_h3]:!text-text [&_strong]:!text-text [&_b]:!text-text [&_td]:!text-text/70 [&_p]:!text-text/80 [&_li]:!text-text/80 [&_span]:!text-text/70 [&_div]:!text-text/70 [&_img]:max-w-full [&_table]:max-w-full [&_*]:!bg-transparent"
+            className="mt-3 pt-3 border-t border-border text-sm leading-relaxed overflow-y-auto [&_a]:text-accent [&_a]:underline [&_*]:!text-text/80 [&_h1]:!text-text [&_h2]:!text-text [&_h3]:!text-text [&_strong]:!text-text [&_b]:!text-text [&_td]:!text-text/70 [&_p]:!text-text/80 [&_li]:!text-text/80 [&_span]:!text-text/70 [&_div]:!text-text/70 [&_img]:max-w-full [&_table]:max-w-full [&_*]:!bg-transparent"
+            style={{ maxHeight: 'calc(100vh - 380px)' }}
             dangerouslySetInnerHTML={{ __html: fullMessage.body.content }}
           />
         )}
@@ -80,7 +90,7 @@ export default function EmailCard({ email, suggestion, index, total, onAddTask, 
           onClick={() => setExpanded(!expanded)}
           className="text-accent-dim text-xs mt-2 hover:text-accent transition-colors"
         >
-          {expanded ? '▾ hide full email' : '▸ show full email'}
+          {expanded ? '▾ collapse' : '▸ show full email'}
         </button>
       </div>
 
