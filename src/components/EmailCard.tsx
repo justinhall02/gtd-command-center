@@ -9,6 +9,7 @@ interface Props {
   total: number
   onAddTask: () => void
   onMove: () => void
+  onMisrouted: () => void
   onArchive: () => void
   onSkip: () => void
 }
@@ -23,7 +24,7 @@ function timeAgo(dateStr: string): string {
   return `${days}d ago`
 }
 
-export default function EmailCard({ email, suggestion, index, total, onAddTask, onMove, onArchive, onSkip }: Props) {
+export default function EmailCard({ email, suggestion, index, total, onAddTask, onMove, onMisrouted, onArchive, onSkip }: Props) {
   const [expanded, setExpanded] = useState(false)
   const { message: fullMessage } = useFullMessage(expanded ? email.id : null)
 
@@ -90,10 +91,16 @@ export default function EmailCard({ email, suggestion, index, total, onAddTask, 
           [M] Move To
         </button>
         <button
-          onClick={onArchive}
-          className="px-3 py-1.5 text-xs font-medium border border-border text-text-dim hover:bg-surface-hover transition-colors"
+          onClick={onMisrouted}
+          className="px-3 py-1.5 text-xs font-medium border border-danger/40 text-danger hover:bg-danger/10 transition-colors"
         >
-          [A] Archive
+          [R] Misrouted
+        </button>
+        <button
+          onClick={onArchive}
+          className="px-3 py-1.5 text-xs font-medium border border-border text-text-dim hover:bg-danger/20 hover:text-danger hover:border-danger/40 transition-colors"
+        >
+          [D] Delete
         </button>
         <button
           onClick={onSkip}

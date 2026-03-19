@@ -45,11 +45,18 @@ router.post('/:id/process', async (req, res) => {
     const { action, destination, emailMeta } = req.body
 
     if (action === 'archive') {
-      // Move to Archive folder
       const folders = await graph.listFolders()
       const archive = folders.find((f: any) => f.displayName === 'Archive')
       if (archive) {
         await graph.moveMessage(req.params.id, archive.id)
+      }
+    }
+
+    if (action === 'delete') {
+      const folders = await graph.listFolders()
+      const trash = folders.find((f: any) => f.displayName === 'Deleted Items')
+      if (trash) {
+        await graph.moveMessage(req.params.id, trash.id)
       }
     }
 
@@ -58,9 +65,17 @@ router.post('/:id/process', async (req, res) => {
       VALUES (?, ?, ?)
     `).run(req.params.id, action, destination || null)
 
-    // Record decision for learning
+    // Record decision for learning — misroutes are corrections
     if (emailMeta) {
-      recordDecision('process', emailMeta, `${action}:${destination || 'none'}`)
+      const isMisroute = action === 'misrouted'
+      recordDecision(
+        'process',
+        emailMeta,
+        `${action}:${destination || 'none'}`,
+        isMisroute ? `routed_to:${emailMeta.folder}` : undefined,  // what the rules suggested (wrong folder)
+        undefined,
+        isMisroute ? `Was in ${emailMeta.folder}, should be in ${emailMeta.correctedTo}` : undefined
+      )
     }
 
     res.json({ ok: true })

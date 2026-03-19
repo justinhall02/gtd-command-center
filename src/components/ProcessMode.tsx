@@ -15,6 +15,7 @@ export default function ProcessMode() {
   const [currentIndex, setCurrentIndex] = useState(0)
   const [showTaskForm, setShowTaskForm] = useState(false)
   const [showMoveMenu, setShowMoveMenu] = useState(false)
+  const [showMisrouteMenu, setShowMisrouteMenu] = useState(false)
   const [suggestion, setSuggestion] = useState<Suggestion | null>(null)
 
   // Load Inbox child folders on mount
@@ -44,6 +45,7 @@ export default function ProcessMode() {
   const advanceToNext = useCallback(() => {
     setShowTaskForm(false)
     setShowMoveMenu(false)
+    setShowMisrouteMenu(false)
     setSuggestion(null)
     if (currentIndex < messages.length - 1) {
       setCurrentIndex(i => i + 1)
@@ -53,9 +55,9 @@ export default function ProcessMode() {
     }
   }, [currentIndex, messages.length, refresh])
 
-  const handleArchive = async () => {
+  const handleDelete = async () => {
     if (!currentEmail) return
-    await processMessage(currentEmail.id, 'archive', undefined, {
+    await processMessage(currentEmail.id, 'delete', undefined, {
       from: currentEmail.from.emailAddress.address,
       subject: currentEmail.subject,
       hasAttachments: currentEmail.hasAttachments,
@@ -79,18 +81,35 @@ export default function ProcessMode() {
     advanceToNext()
   }
 
+  const handleMisroute = async (folderId: string, folderName: string) => {
+    if (!currentEmail) return
+    // Find what folder this email is currently in
+    const currentFolderName = allFolders.find(f => f.id === selectedFolder)?.displayName || 'unknown'
+    await moveMessage(currentEmail.id, folderId, folderName)
+    await processMessage(currentEmail.id, 'misrouted', folderName, {
+      from: currentEmail.from.emailAddress.address,
+      subject: currentEmail.subject,
+      hasAttachments: currentEmail.hasAttachments,
+      folder: currentFolderName,
+      correctedTo: folderName,
+    })
+    setShowMisrouteMenu(false)
+    advanceToNext()
+  }
+
   // Keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (showTaskForm) return // Don't capture when typing
       if (e.key === 't' || e.key === 'T') { e.preventDefault(); setShowTaskForm(true) }
-      if (e.key === 'm' || e.key === 'M') { e.preventDefault(); setShowMoveMenu(!showMoveMenu) }
-      if (e.key === 'a' || e.key === 'A') { e.preventDefault(); handleArchive() }
+      if (e.key === 'm' || e.key === 'M') { e.preventDefault(); setShowMoveMenu(!showMoveMenu); setShowMisrouteMenu(false) }
+      if (e.key === 'r' || e.key === 'R') { e.preventDefault(); setShowMisrouteMenu(!showMisrouteMenu); setShowMoveMenu(false) }
+      if (e.key === 'd' || e.key === 'D') { e.preventDefault(); handleDelete() }
       if (e.key === 'ArrowRight' || e.key === 'j') { e.preventDefault(); handleSkip() }
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [showTaskForm, showMoveMenu, handleArchive, handleSkip])
+  }, [showTaskForm, showMoveMenu, showMisrouteMenu, handleDelete, handleSkip])
 
   if (foldersLoading) {
     return <div className="text-text-dim text-xs">Loading folders...</div>
@@ -136,8 +155,9 @@ export default function ProcessMode() {
             index={currentIndex}
             total={messages.length}
             onAddTask={() => setShowTaskForm(true)}
-            onMove={() => setShowMoveMenu(!showMoveMenu)}
-            onArchive={handleArchive}
+            onMove={() => { setShowMoveMenu(!showMoveMenu); setShowMisrouteMenu(false) }}
+            onMisrouted={() => { setShowMisrouteMenu(!showMisrouteMenu); setShowMoveMenu(false) }}
+            onArchive={handleDelete}
             onSkip={handleSkip}
           />
 
@@ -171,12 +191,33 @@ export default function ProcessMode() {
                 ))}
             </div>
           )}
+
+          {/* Misroute menu */}
+          {showMisrouteMenu && (
+            <div className="border border-danger/40 bg-surface mt-2 max-h-64 overflow-y-auto">
+              <div className="px-4 py-2 border-b border-danger/30 text-danger text-xs font-medium tracking-wider">
+                MISROUTED — WHERE SHOULD THIS GO?
+              </div>
+              {allFolders
+                .filter(f => f.id !== selectedFolder)
+                .map(f => (
+                  <button
+                    key={f.id}
+                    onClick={() => handleMisroute(f.id, f.displayName)}
+                    className="w-full text-left px-4 py-2 text-xs text-text hover:bg-danger/10 hover:text-danger transition-colors border-b border-border last:border-b-0"
+                  >
+                    {f.displayName}
+                    <span className="text-text-dim ml-2">({f.totalItemCount})</span>
+                  </button>
+                ))}
+            </div>
+          )}
         </>
       )}
 
       {/* Keyboard shortcut hint */}
       <div className="mt-6 text-center text-text-dim text-xs opacity-50">
-        [T] add task · [M] move · [A] archive · [→] skip
+        [T] add task · [M] move · [R] misrouted · [D] delete · [→] skip
       </div>
     </div>
   )
