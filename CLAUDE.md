@@ -136,6 +136,12 @@ These are guardrails discovered through failed verifications. Agents MUST check 
 3. Legacy `color="..."` HTML attributes
 **Guardrail**: `sanitizeEmailHtml()` must strip ALL of: `<style>` blocks, `style=""` attrs, `bgcolor=""` attrs, `color=""` attrs. If any new email styling method is found, add it here and to the function.
 
+### LL-003: Strip surgically — remove colors, preserve layout
+**Date**: 2026-03-19
+**Bug**: Stripping ALL inline styles fixed readability but destroyed formatting (no padding, spacing, or font sizing)
+**Root cause**: First fix was too aggressive — removed all `style` attributes wholesale instead of targeting only color properties
+**Guardrail**: `sanitizeEmailHtml()` must parse individual CSS properties and strip ONLY color-producing ones (`color`, `background`, `background-color`, `bgcolor`). Layout properties (`padding`, `margin`, `font-size`, `width`, `border`, `border-radius`, `text-align`, etc.) MUST be preserved.
+
 ### LL-002: Verify against the user's exact broken data
 **Date**: 2026-03-19
 **Bug**: Visual verifier passed using a Fireflies email while the user's broken email was from HubSpot

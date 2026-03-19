@@ -17,17 +17,37 @@ interface Props {
   isQuoteEmail: boolean
 }
 
-// Strip ALL styles from email HTML so our dark theme CSS takes full control
+// Strip color/background styles from email HTML but KEEP layout styles (padding, margin, etc.)
 function sanitizeEmailHtml(html: string): string {
-  return html
-    // Remove <style>...</style> blocks (emails embed class-based CSS here)
-    .replace(/<style[\s\S]*?<\/style>/gi, '')
-    // Remove all inline style="..." attributes
-    .replace(/\sstyle="[^"]*"/gi, '')
-    // Remove bgcolor attributes (old-school HTML email tables)
-    .replace(/\sbgcolor="[^"]*"/gi, '')
-    // Remove color attributes
-    .replace(/\scolor="[^"]*"/gi, '')
+  // Remove <style> blocks (class-based CSS with colors/backgrounds)
+  let cleaned = html.replace(/<style[\s\S]*?<\/style>/gi, '')
+
+  // Remove legacy HTML color attributes
+  cleaned = cleaned.replace(/\sbgcolor="[^"]*"/gi, '')
+  cleaned = cleaned.replace(/\scolor="[^"]*"/gi, '')
+
+  // For inline style="..." — strip only color/background properties, keep layout
+  cleaned = cleaned.replace(/\sstyle="([^"]*)"/gi, (_match, styleContent: string) => {
+    // Remove color and background properties but keep everything else
+    const cleaned_props = styleContent
+      .split(';')
+      .map((prop: string) => prop.trim())
+      .filter((prop: string) => {
+        if (!prop) return false
+        const lower = prop.toLowerCase()
+        // Strip these — they fight our dark theme
+        if (lower.startsWith('color')) return false
+        if (lower.startsWith('background-color')) return false
+        if (lower.startsWith('background')) return false
+        // Keep everything else — padding, margin, font-size, width, border-radius, etc.
+        return true
+      })
+      .join('; ')
+
+    return cleaned_props ? ` style="${cleaned_props}"` : ''
+  })
+
+  return cleaned
 }
 
 function timeAgo(dateStr: string): string {
