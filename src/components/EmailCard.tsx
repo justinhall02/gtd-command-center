@@ -61,15 +61,17 @@ export default function EmailCard({ email, suggestion, index, total, onAddTask, 
           <span className="text-text-dim text-xs">{timeAgo(email.receivedDateTime)}</span>
         </div>
         <h3 className="text-text font-medium text-sm mb-2">{email.subject}</h3>
-        <p className="text-text/70 text-xs leading-relaxed">
-          {email.bodyPreview}
-        </p>
+        {!expanded && (
+          <p className="text-text/70 text-xs leading-relaxed">
+            {email.bodyPreview}
+          </p>
+        )}
 
-        {/* Expanded full email */}
+        {/* Expanded full email — no scroll cap, force light text over email's dark inline styles */}
         {expanded && fullMessage?.body && (
           <div
             ref={emailBodyRef}
-            className="mt-3 pt-3 border-t border-border text-xs text-text-dim leading-relaxed max-h-64 overflow-y-auto [&_a]:text-accent [&_a]:underline"
+            className="mt-3 pt-3 border-t border-border text-sm leading-relaxed [&_a]:text-accent [&_a]:underline [&_*]:!text-text/80 [&_h1]:!text-text [&_h2]:!text-text [&_h3]:!text-text [&_strong]:!text-text [&_b]:!text-text [&_td]:!text-text/70 [&_p]:!text-text/80 [&_li]:!text-text/80 [&_span]:!text-text/70 [&_div]:!text-text/70 [&_img]:max-w-full [&_table]:max-w-full [&_*]:!bg-transparent"
             dangerouslySetInnerHTML={{ __html: fullMessage.body.content }}
           />
         )}

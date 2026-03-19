@@ -99,18 +99,18 @@ export default function ProcessMode({ initialFolderId }: Props) {
   }, [])
 
   // Remove email from list after delete/move/misroute/coro/quote
-  // The next email slides into the same index position automatically.
-  // If we were at the end, clamp back.
+  // When we remove an email, the array shrinks. If we're at the last item,
+  // we need to go back one. Otherwise the same index now points to the next email.
   const removeAndAdvance = useCallback((emailId: string) => {
     resetPanels()
+    const idx = messages.findIndex(m => m.id === emailId)
+    const isLast = idx === messages.length - 1
     removeMessage(emailId)
-    // If we're at or past the new end, clamp index
-    setCurrentIndex(i => {
-      const newLength = messages.length - 1
-      if (newLength <= 0) return 0
-      return i >= newLength ? newLength - 1 : i
-    })
-  }, [messages.length, removeMessage, resetPanels])
+    if (isLast && idx > 0) {
+      setCurrentIndex(idx - 1)
+    }
+    // Otherwise keep same index — next email slides into this position
+  }, [messages, removeMessage, resetPanels])
 
   const handleDelete = async () => {
     if (!currentEmail) return
