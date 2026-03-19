@@ -36,11 +36,17 @@ body {
   background: var(--color-text-dim);
 }
 
-/* Force email body content to use our dark theme colors */
-.email-body-override,
+/* Force email body content to use dark theme — all inline styles are stripped by sanitizeEmailHtml */
+.email-body-override {
+  color: var(--color-text) !important;
+  background-color: var(--color-surface) !important;
+  padding: 16px;
+  border-radius: 4px;
+}
 .email-body-override * {
   color: var(--color-text) !important;
   background-color: transparent !important;
+  border-color: var(--color-border) !important;
 }
 .email-body-override a {
   color: var(--color-accent) !important;
@@ -55,7 +61,16 @@ body {
 }
 .email-body-override img {
   max-width: 100%;
+  height: auto;
 }
 .email-body-override table {
   max-width: 100%;
+}
+.email-body-override td,
+.email-body-override th {
+  color: var(--color-text) !important;
+  background-color: transparent !important;
+}
+.email-body-override hr {
+  border-color: var(--color-border) !important;
 }

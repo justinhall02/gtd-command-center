@@ -17,13 +17,17 @@ interface Props {
   isQuoteEmail: boolean
 }
 
-// Strip inline color and background styles from email HTML so our dark theme shows through
+// Strip ALL styles from email HTML so our dark theme CSS takes full control
 function sanitizeEmailHtml(html: string): string {
   return html
-    .replace(/\bcolor\s*:\s*[^;!"]+(;|(?="))/gi, 'color: inherit;')
-    .replace(/\bbackground-color\s*:\s*[^;!"]+(;|(?="))/gi, 'background-color: transparent;')
-    .replace(/\bbackground\s*:\s*#[0-9a-fA-F]{3,8}(;|(?="))/gi, 'background: transparent;')
-    .replace(/\bbackground\s*:\s*rgb[^;"]+(;|(?="))/gi, 'background: transparent;')
+    // Remove <style>...</style> blocks (emails embed class-based CSS here)
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    // Remove all inline style="..." attributes
+    .replace(/\sstyle="[^"]*"/gi, '')
+    // Remove bgcolor attributes (old-school HTML email tables)
+    .replace(/\sbgcolor="[^"]*"/gi, '')
+    // Remove color attributes
+    .replace(/\scolor="[^"]*"/gi, '')
 }
 
 function timeAgo(dateStr: string): string {
