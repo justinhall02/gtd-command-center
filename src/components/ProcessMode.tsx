@@ -35,6 +35,34 @@ export default function ProcessMode({ initialFolderId }: Props) {
   const [suggestion, setSuggestion] = useState<Suggestion | null>(null)
   const [folderRanking, setFolderRanking] = useState<FolderRanking[]>([])
   const [misroutePatterns, setMisroutePatterns] = useState<MisroutePattern[]>([])
+  const [lastAction, setLastAction] = useState<{
+    emailId: string
+    emailSubject: string
+    action: string
+    fromFolderId: string
+    detail?: string
+  } | null>(null)
+  const [undoTimer, setUndoTimer] = useState<ReturnType<typeof setTimeout> | null>(null)
+
+  // Auto-dismiss undo bar after 10 seconds
+  const showUndo = useCallback((action: { emailId: string; emailSubject: string; action: string; fromFolderId: string; detail?: string }) => {
+    if (undoTimer) clearTimeout(undoTimer)
+    setLastAction(action)
+    const timer = setTimeout(() => setLastAction(null), 10000)
+    setUndoTimer(timer)
+  }, [undoTimer])
+
+  const handleUndo = useCallback(async () => {
+    if (!lastAction || !selectedFolder) return
+    try {
+      await moveMessage(lastAction.emailId, lastAction.fromFolderId)
+      refresh()
+      setLastAction(null)
+      if (undoTimer) clearTimeout(undoTimer)
+    } catch (err) {
+      console.error('Undo failed:', err)
+    }
+  }, [lastAction, selectedFolder, undoTimer, refresh])
 
   // Load folder usage ranking + misroute patterns
   useEffect(() => {
@@ -113,13 +141,15 @@ export default function ProcessMode({ initialFolderId }: Props) {
   }, [messages, removeMessage, resetPanels])
 
   const handleDelete = async () => {
-    if (!currentEmail) return
+    if (!currentEmail || !selectedFolder) return
     const id = currentEmail.id
+    const subj = currentEmail.subject
     await processMessage(id, 'delete', undefined, {
       from: currentEmail.from.emailAddress.address,
       subject: currentEmail.subject,
       hasAttachments: currentEmail.hasAttachments,
     })
+    showUndo({ emailId: id, emailSubject: subj, action: 'Deleted', fromFolderId: selectedFolder })
     removeAndAdvance(id)
   }
 
@@ -134,20 +164,23 @@ export default function ProcessMode({ initialFolderId }: Props) {
   }
 
   const handleMove = async (folderId: string, folderName: string) => {
-    if (!currentEmail) return
+    if (!currentEmail || !selectedFolder) return
     const id = currentEmail.id
+    const subj = currentEmail.subject
     await moveMessage(id, folderId, folderName)
     await processMessage(id, 'moved', folderName, {
       from: currentEmail.from.emailAddress.address,
       subject: currentEmail.subject,
       hasAttachments: currentEmail.hasAttachments,
     })
+    showUndo({ emailId: id, emailSubject: subj, action: 'Moved', fromFolderId: selectedFolder, detail: folderName })
     removeAndAdvance(id)
   }
 
   const handleMisroute = async (folderId: string, folderName: string) => {
-    if (!currentEmail) return
+    if (!currentEmail || !selectedFolder) return
     const id = currentEmail.id
+    const subj = currentEmail.subject
     const currentFolderName = allFolders.find(f => f.id === selectedFolder)?.displayName || 'unknown'
     await moveMessage(id, folderId, folderName)
     await processMessage(id, 'misrouted', folderName, {
@@ -157,28 +190,33 @@ export default function ProcessMode({ initialFolderId }: Props) {
       folder: currentFolderName,
       correctedTo: folderName,
     })
+    showUndo({ emailId: id, emailSubject: subj, action: 'Misrouted', fromFolderId: selectedFolder, detail: folderName })
     removeAndAdvance(id)
   }
 
   const handleReportSpam = async () => {
-    if (!currentEmail) return
+    if (!currentEmail || !selectedFolder) return
     const id = currentEmail.id
+    const subj = currentEmail.subject
     await reportSpam(id, 'junk', {
       from: currentEmail.from.emailAddress.address,
       subject: currentEmail.subject,
       hasAttachments: currentEmail.hasAttachments,
     })
+    showUndo({ emailId: id, emailSubject: subj, action: 'Reported spam', fromFolderId: selectedFolder })
     removeAndAdvance(id)
   }
 
   const handleReportPhishing = async () => {
-    if (!currentEmail) return
+    if (!currentEmail || !selectedFolder) return
     const id = currentEmail.id
+    const subj = currentEmail.subject
     await reportSpam(id, 'phish', {
       from: currentEmail.from.emailAddress.address,
       subject: currentEmail.subject,
       hasAttachments: currentEmail.hasAttachments,
     })
+    showUndo({ emailId: id, emailSubject: subj, action: 'Reported phishing', fromFolderId: selectedFolder })
     removeAndAdvance(id)
   }
 
@@ -222,6 +260,7 @@ export default function ProcessMode({ initialFolderId }: Props) {
   // Keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
+      if (e.key === 'z' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); handleUndo(); return }
       if (showTaskForm) return // Don't capture when typing
       if (e.key === 'q' || e.key === 'Q') { e.preventDefault(); if (isQuoteEmail) handleQuoteIt() }
       if (e.key === 't' || e.key === 'T') { e.preventDefault(); setShowTaskForm(true) }
@@ -234,7 +273,7 @@ export default function ProcessMode({ initialFolderId }: Props) {
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [showTaskForm, showMoveMenu, showMisrouteMenu, handleDelete, handleSkip])
+  }, [showTaskForm, showMoveMenu, showMisrouteMenu, handleDelete, handleSkip, handleUndo])
 
   if (foldersLoading) {
     return <div className="text-text-dim text-xs">Loading folders...</div>
@@ -258,6 +297,22 @@ export default function ProcessMode({ initialFolderId }: Props) {
           </span>
         )}
       </div>
+
+      {/* Undo bar */}
+      {lastAction && (
+        <div className="mb-4 px-4 py-2 border border-accent/40 bg-accent/5 flex items-center justify-between">
+          <span className="text-text text-xs">
+            {lastAction.action}: <span className="text-text-dim">{lastAction.emailSubject.slice(0, 50)}</span>
+            {lastAction.detail && <span className="text-accent"> → {lastAction.detail}</span>}
+          </span>
+          <button
+            onClick={handleUndo}
+            className="px-3 py-1 text-xs font-medium bg-accent text-bg hover:bg-accent-dim transition-colors"
+          >
+            Undo [Ctrl+Z]
+          </button>
+        </div>
+      )}
 
       {/* Misroute warning banner */}
       {activeMisrouteWarning && (

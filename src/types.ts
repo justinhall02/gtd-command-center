@@ -17,6 +17,7 @@ export interface EmailMessage {
   receivedDateTime: string
   isRead: boolean
   hasAttachments: boolean
+  webLink?: string
 }
 
 export interface TodoList {

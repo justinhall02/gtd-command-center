@@ -116,7 +116,7 @@ export const graph = {
   },
 
   async getMessage(messageId: string) {
-    return graphCall(`/me/messages/${messageId}?$select=id,subject,from,toRecipients,body,bodyPreview,receivedDateTime,isRead,hasAttachments`)
+    return graphCall(`/me/messages/${messageId}?$select=id,subject,from,toRecipients,body,bodyPreview,receivedDateTime,isRead,hasAttachments,webLink`)
   },
 
   async moveMessage(messageId: string, destinationFolderId: string) {

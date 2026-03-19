@@ -78,7 +78,7 @@ export default function EmailCard({ email, suggestion, index, total, onAddTask, 
 
   return (
     <div className="border border-border bg-surface">
-      {/* Header — always visible, with minimize button when expanded */}
+      {/* Header — always visible, with reply + minimize buttons */}
       <div className="px-4 py-3 border-b border-border flex items-center justify-between">
         <span className="text-text-dim text-xs">
           Email {index + 1} of {total}
@@ -86,6 +86,16 @@ export default function EmailCard({ email, suggestion, index, total, onAddTask, 
         <div className="flex items-center gap-3">
           {email.hasAttachments && (
             <span className="text-warning text-xs">+ attachments</span>
+          )}
+          {fullMessage?.webLink && (
+            <a
+              href={fullMessage.webLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-accent text-xs hover:text-accent-dim transition-colors"
+            >
+              Open in Outlook
+            </a>
           )}
           {expanded && (
             <button
