@@ -170,8 +170,10 @@ export function launchSession(tasks: TaskForSession[]): { promptFile: string } {
   }))
 
   // Launch Claude in Windows Terminal via WSL
+  // Source .bashrc for nvm/PATH, then run claude with full path as fallback
   // All user-supplied content is in files, not inline — prevents shell injection
-  const cmd = `cmd.exe /c start wt wsl -e bash -c "cd /mnt/c/Users/JustinHall/gtd-command-center && claude --dangerously-skip-permissions --chrome --name 'GTD Execute Session' --system-prompt \\"$(cat ${promptFile})\\" \\"$(cat ${initialPromptFile})\\""`
+  const CLAUDE_BIN = '/home/justin/.nvm/versions/node/v20.19.4/bin/claude'
+  const cmd = `cmd.exe /c start wt wsl -e bash -ic "cd /mnt/c/Users/JustinHall/gtd-command-center && ${CLAUDE_BIN} --dangerously-skip-permissions --chrome --name 'GTD Execute Session' --system-prompt \\"$(cat ${promptFile})\\" \\"$(cat ${initialPromptFile})\\""`
 
   console.log(`[SESSION] Launching Claude session with ${tasks.length} tasks`)
 
