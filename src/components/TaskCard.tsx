@@ -4,6 +4,7 @@ interface Props {
   task: Task
   onExecute: () => void
   onComplete: () => void
+  onDismiss: () => void
 }
 
 function timeAgo(dateStr: string): string {
@@ -16,7 +17,7 @@ function timeAgo(dateStr: string): string {
   return `${days}d ago`
 }
 
-export default function TaskCard({ task, onExecute, onComplete }: Props) {
+export default function TaskCard({ task, onExecute, onComplete, onDismiss }: Props) {
   const isRunning = task.status === 'in_progress'
   const isDone = task.status === 'completed'
 
@@ -40,7 +41,16 @@ export default function TaskCard({ task, onExecute, onComplete }: Props) {
         )}
       </div>
 
-      <div className="flex-shrink-0 ml-3">
+      <div className="flex-shrink-0 ml-3 flex gap-2">
+        {!isDone && (
+          <button
+            onClick={onDismiss}
+            className="px-2 py-1 text-xs text-text-dim hover:text-danger transition-colors"
+            title="Dismiss task"
+          >
+            ✕
+          </button>
+        )}
         {task.claude_type === 'autonomous' && !isDone && (
           <button
             onClick={onExecute}

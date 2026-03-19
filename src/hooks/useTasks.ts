@@ -76,3 +76,8 @@ export async function getTaskResult(id: string) {
   const res = await fetch(`${API}/tasks/${id}/result`)
   return res.json()
 }
+
+export async function deleteTask(id: string) {
+  const res = await fetch(`${API}/tasks/${id}`, { method: 'DELETE' })
+  return res.json()
+}

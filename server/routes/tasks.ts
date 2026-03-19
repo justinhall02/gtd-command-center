@@ -2,7 +2,7 @@ import { Router } from 'express'
 import { v4 as uuid } from 'uuid'
 import db from '../db.js'
 import { graph } from '../services/graph.js'
-import { queueCommand, getResult, listPendingCommands } from '../services/claude.js'
+import { queueCommand, getResult, listPendingCommands, completeCommand } from '../services/claude.js'
 import { recordDecision } from '../services/decisions.js'
 
 const router = Router()
@@ -175,6 +175,33 @@ router.get('/:id/result', (req, res) => {
     }
 
     res.json({ status: task.status, executionLog: task.execution_log ? JSON.parse(task.execution_log) : null })
+  } catch (err: any) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// Delete/dismiss a task and its pending command
+router.delete('/:id', (req, res) => {
+  try {
+    const task = db.prepare('SELECT * FROM tasks WHERE id = ?').get(req.params.id) as any
+    if (!task) return res.status(404).json({ error: 'Task not found' })
+
+    // Remove any pending command for this task
+    const pending = listPendingCommands().find(c => c.taskId === task.id)
+    if (pending) {
+      completeCommand(pending.id, {
+        commandId: pending.id,
+        taskId: task.id,
+        status: 'error',
+        summary: 'Dismissed by user',
+        actions: [],
+      })
+    }
+
+    // Delete from local DB
+    db.prepare('DELETE FROM tasks WHERE id = ?').run(req.params.id)
+
+    res.json({ ok: true })
   } catch (err: any) {
     res.status(500).json({ error: err.message })
   }

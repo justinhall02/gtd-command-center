@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react'
-import { useTodoLists, useTasks, queueTaskExecution, updateTask } from '../hooks/useTasks'
+import { useTodoLists, useTasks, queueTaskExecution, updateTask, deleteTask } from '../hooks/useTasks'
 import ListPicker from './ListPicker'
 import TaskCard from './TaskCard'
 import type { Task } from '../types'
@@ -57,6 +57,16 @@ export default function ExecuteMode() {
     refresh()
   }
 
+  const handleDismiss = async (task: Task) => {
+    await deleteTask(task.id)
+    setExecutionLog(prev => [{
+      time: new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' }),
+      message: `Dismissed "${task.title}"`,
+      status: 'dismissed',
+    }, ...prev])
+    refresh()
+  }
+
   if (loading) {
     return <div className="text-text-dim text-xs">Loading tasks...</div>
   }
@@ -86,7 +96,7 @@ export default function ExecuteMode() {
           </div>
           <div className="flex flex-col gap-px bg-border">
             {grouped.autonomous.map(t => (
-              <TaskCard key={t.id} task={t} onExecute={() => handleExecute(t)} onComplete={() => handleComplete(t)} />
+              <TaskCard key={t.id} task={t} onExecute={() => handleExecute(t)} onComplete={() => handleComplete(t)} onDismiss={() => handleDismiss(t)} />
             ))}
           </div>
         </div>
@@ -102,7 +112,7 @@ export default function ExecuteMode() {
           </div>
           <div className="flex flex-col gap-px bg-border">
             {grouped.guided.map(t => (
-              <TaskCard key={t.id} task={t} onExecute={() => handleExecute(t)} onComplete={() => handleComplete(t)} />
+              <TaskCard key={t.id} task={t} onExecute={() => handleExecute(t)} onComplete={() => handleComplete(t)} onDismiss={() => handleDismiss(t)} />
             ))}
           </div>
         </div>
@@ -118,7 +128,7 @@ export default function ExecuteMode() {
           </div>
           <div className="flex flex-col gap-px bg-border">
             {grouped.manual.map(t => (
-              <TaskCard key={t.id} task={t} onExecute={() => handleExecute(t)} onComplete={() => handleComplete(t)} />
+              <TaskCard key={t.id} task={t} onExecute={() => handleExecute(t)} onComplete={() => handleComplete(t)} onDismiss={() => handleDismiss(t)} />
             ))}
           </div>
         </div>
