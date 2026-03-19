@@ -61,7 +61,7 @@ export default function EmailCard({ email, suggestion, index, total, onAddTask, 
           <span className="text-text-dim text-xs">{timeAgo(email.receivedDateTime)}</span>
         </div>
         <h3 className="text-text font-medium text-sm mb-2">{email.subject}</h3>
-        <p className="text-text-dim text-xs leading-relaxed">
+        <p className="text-text/70 text-xs leading-relaxed">
           {email.bodyPreview}
         </p>
 
