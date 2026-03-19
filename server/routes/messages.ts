@@ -53,10 +53,13 @@ router.post('/:id/process', async (req, res) => {
     }
 
     if (action === 'delete') {
-      const folders = await graph.listFolders()
-      const trash = folders.find((f: any) => f.displayName === 'Deleted Items')
-      if (trash) {
-        await graph.moveMessage(req.params.id, trash.id)
+      console.log(`[DELETE] Moving message ${req.params.id.slice(0, 30)}... to Deleted Items`)
+      try {
+        await graph.moveMessage(req.params.id, 'deleteditems')
+        console.log(`[DELETE] Success`)
+      } catch (moveErr: any) {
+        console.error(`[DELETE] FAILED:`, moveErr.message)
+        throw moveErr
       }
     }
 
