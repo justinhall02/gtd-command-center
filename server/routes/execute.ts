@@ -86,4 +86,21 @@ router.post('/session/start', (_req, res) => {
   }
 })
 
+// Stop/reset the session (clears lock, resets in_progress tasks to pending)
+router.post('/session/stop', (_req, res) => {
+  try {
+    // Clear lock file
+    const lockFile = '/tmp/gtd-session-active.lock'
+    const fs = require('fs')
+    if (fs.existsSync(lockFile)) fs.unlinkSync(lockFile)
+
+    // Reset in_progress tasks back to pending
+    const result = db.prepare("UPDATE tasks SET status = 'pending' WHERE status = 'in_progress'").run()
+
+    res.json({ ok: true, tasksReset: result.changes })
+  } catch (err: any) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 export default router

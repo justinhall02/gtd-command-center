@@ -8,7 +8,7 @@ import ExecuteMode from './components/ExecuteMode'
 export type AppMode = Mode | 'home'
 
 export default function App() {
-  const [mode, setMode] = useState<AppMode>('home')
+  const [mode, setMode] = useState<AppMode>('execute')
   const [initialFolderId, setInitialFolderId] = useState<string | null>(null)
 
   const navigateToFolder = (folderId: string) => {

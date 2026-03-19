@@ -65,6 +65,16 @@ export default function ExecuteMode() {
     }
   }
 
+  const handleStopSession = async () => {
+    try {
+      await fetch('/api/execute/session/stop', { method: 'POST' })
+      setSessionActive(false)
+      refresh()
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
   const handleDismiss = async (task: Task) => {
     await deleteTask(task.id)
     refresh()
@@ -106,9 +116,17 @@ export default function ExecuteMode() {
 
       {/* Session active banner */}
       {sessionActive && (
-        <div className="mb-4 px-4 py-2 border border-warning/40 bg-warning/5 text-xs flex items-center gap-2">
-          <span className="text-warning animate-pulse">●</span>
-          <span className="text-text">Claude is working in Windows Terminal — switch to it to interact</span>
+        <div className="mb-4 px-4 py-2 border border-warning/40 bg-warning/5 text-xs flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-warning animate-pulse">●</span>
+            <span className="text-text">Claude is working in Windows Terminal — switch to it to interact</span>
+          </div>
+          <button
+            onClick={handleStopSession}
+            className="px-3 py-1 text-xs font-medium border border-danger/40 text-danger hover:bg-danger/10 transition-colors"
+          >
+            Stop Session
+          </button>
         </div>
       )}
 
