@@ -98,6 +98,44 @@ export function getSuggestion(email: { from?: string; subject?: string; hasAttac
   }
 }
 
+// Get folder usage frequency for sorting misroute/move menus
+export function getFolderUsageRanking(): Array<{ folder: string; count: number }> {
+  const rows = db.prepare(`
+    SELECT destination as folder, COUNT(*) as cnt
+    FROM processed_emails
+    WHERE action IN ('moved', 'misrouted') AND destination IS NOT NULL
+    ORDER BY cnt DESC
+    LIMIT 100
+  `).all() as Array<{ folder: string; cnt: number }>
+
+  return rows.map(r => ({ folder: r.folder, count: r.cnt }))
+}
+
+// Get misroute patterns — which source folders keep getting corrected to which destinations
+export function getMisroutePatterns(): Array<{ fromFolder: string; toFolder: string; count: number; suggestion: string }> {
+  const rows = db.prepare(`
+    SELECT
+      json_extract(input_features, '$.folder') as from_folder,
+      correction_notes,
+      COUNT(*) as cnt
+    FROM decisions
+    WHERE type = 'process' AND was_correction = 1 AND correction_notes IS NOT NULL
+    GROUP BY from_folder, correction_notes
+    ORDER BY cnt DESC
+  `).all() as any[]
+
+  return rows.map(r => {
+    // Parse "Was in X, should be in Y" format
+    const match = (r.correction_notes || '').match(/Was in (.+), should be in (.+)/)
+    return {
+      fromFolder: match?.[1] || r.from_folder || 'unknown',
+      toFolder: match?.[2] || 'unknown',
+      count: r.cnt,
+      suggestion: `Emails keep getting misrouted from "${match?.[1]}" to "${match?.[2]}" (${r.cnt} times). Consider updating your mail rules.`,
+    }
+  }).filter(r => r.toFolder !== 'unknown')
+}
+
 export function getPatterns(): Array<{ fingerprint: string; features: InputFeatures; topAction: string; count: number; confidence: number }> {
   const rows = db.prepare(`
     SELECT input_fingerprint, input_features, actual_action,

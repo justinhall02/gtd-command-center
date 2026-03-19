@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import type { MailFolder, Suggestion } from '../types'
 import { useFolders, useMessages, processMessage, moveMessage, reportToCoro } from '../hooks/useEmails'
 import { useTodoLists } from '../hooks/useTasks'
@@ -8,6 +8,18 @@ import TaskForm from './TaskForm'
 
 interface Props {
   initialFolderId?: string | null
+}
+
+interface FolderRanking {
+  folder: string
+  count: number
+}
+
+interface MisroutePattern {
+  fromFolder: string
+  toFolder: string
+  count: number
+  suggestion: string
 }
 
 export default function ProcessMode({ initialFolderId }: Props) {
@@ -21,6 +33,34 @@ export default function ProcessMode({ initialFolderId }: Props) {
   const [showMoveMenu, setShowMoveMenu] = useState(false)
   const [showMisrouteMenu, setShowMisrouteMenu] = useState(false)
   const [suggestion, setSuggestion] = useState<Suggestion | null>(null)
+  const [folderRanking, setFolderRanking] = useState<FolderRanking[]>([])
+  const [misroutePatterns, setMisroutePatterns] = useState<MisroutePattern[]>([])
+
+  // Load folder usage ranking + misroute patterns
+  useEffect(() => {
+    fetch('/api/execute/folder-ranking').then(r => r.json()).then(setFolderRanking).catch(() => {})
+    fetch('/api/execute/misroute-patterns').then(r => r.json()).then(setMisroutePatterns).catch(() => {})
+  }, [])
+
+  // Sort folders by usage frequency (most used first, then alphabetical for unranked)
+  const sortedFolders = useMemo(() => {
+    const rankMap = new Map(folderRanking.map(r => [r.folder, r.count]))
+    return [...allFolders]
+      .filter(f => f.id !== selectedFolder)
+      .sort((a, b) => {
+        const aRank = rankMap.get(a.displayName) || 0
+        const bRank = rankMap.get(b.displayName) || 0
+        if (aRank !== bRank) return bRank - aRank  // higher count first
+        return a.displayName.localeCompare(b.displayName)
+      })
+  }, [allFolders, folderRanking, selectedFolder])
+
+  // Check if current folder has active misroute warnings
+  const activeMisrouteWarning = useMemo(() => {
+    const currentFolderName = allFolders.find(f => f.id === selectedFolder)?.displayName
+    if (!currentFolderName) return null
+    return misroutePatterns.find(p => p.fromFolder === currentFolderName) || null
+  }, [misroutePatterns, selectedFolder, allFolders])
 
   // Load Inbox child folders on mount
   useEffect(() => {
@@ -192,6 +232,14 @@ export default function ProcessMode({ initialFolderId }: Props) {
         )}
       </div>
 
+      {/* Misroute warning banner */}
+      {activeMisrouteWarning && (
+        <div className="mb-4 px-4 py-2 border border-danger/40 bg-danger/5 text-xs">
+          <span className="text-danger font-medium">Rule issue:</span>{' '}
+          <span className="text-text-dim">{activeMisrouteWarning.suggestion}</span>
+        </div>
+      )}
+
       {/* Loading state */}
       {msgsLoading && (
         <div className="text-text-dim text-xs py-8 text-center">Loading emails...</div>
@@ -232,45 +280,62 @@ export default function ProcessMode({ initialFolderId }: Props) {
             />
           )}
 
-          {/* Move menu */}
+          {/* Move menu — sorted by usage frequency */}
           {showMoveMenu && (
             <div className="border border-border bg-surface mt-2 max-h-64 overflow-y-auto">
               <div className="px-4 py-2 border-b border-border text-accent text-xs font-medium tracking-wider">
                 MOVE TO FOLDER
               </div>
-              {allFolders
-                .filter(f => f.id !== selectedFolder)
-                .map(f => (
+              {sortedFolders.map((f, i) => {
+                const rank = folderRanking.find(r => r.folder === f.displayName)
+                return (
                   <button
                     key={f.id}
                     onClick={() => handleMove(f.id, f.displayName)}
-                    className="w-full text-left px-4 py-2 text-xs text-text hover:bg-surface-hover transition-colors border-b border-border last:border-b-0"
+                    className="w-full text-left px-4 py-2 text-xs text-text hover:bg-surface-hover transition-colors border-b border-border last:border-b-0 flex items-center justify-between"
                   >
-                    {f.displayName}
-                    <span className="text-text-dim ml-2">({f.totalItemCount})</span>
+                    <span>
+                      {rank ? <span className="text-accent mr-2">{i + 1}.</span> : null}
+                      {f.displayName}
+                    </span>
+                    <span className="flex items-center gap-2">
+                      {rank && <span className="text-accent text-xs">{rank.count}x</span>}
+                      <span className="text-text-dim">{f.totalItemCount}</span>
+                    </span>
                   </button>
-                ))}
+                )
+              })}
             </div>
           )}
 
-          {/* Misroute menu */}
+          {/* Misroute menu — sorted by usage frequency, flags rule correction */}
           {showMisrouteMenu && (
             <div className="border border-danger/40 bg-surface mt-2 max-h-64 overflow-y-auto">
               <div className="px-4 py-2 border-b border-danger/30 text-danger text-xs font-medium tracking-wider">
                 MISROUTED — WHERE SHOULD THIS GO?
               </div>
-              {allFolders
-                .filter(f => f.id !== selectedFolder)
-                .map(f => (
+              <div className="px-4 py-1.5 border-b border-border bg-danger/5 text-text-dim text-xs">
+                This will flag the mail rule as incorrect
+              </div>
+              {sortedFolders.map((f, i) => {
+                const rank = folderRanking.find(r => r.folder === f.displayName)
+                return (
                   <button
                     key={f.id}
                     onClick={() => handleMisroute(f.id, f.displayName)}
-                    className="w-full text-left px-4 py-2 text-xs text-text hover:bg-danger/10 hover:text-danger transition-colors border-b border-border last:border-b-0"
+                    className="w-full text-left px-4 py-2 text-xs text-text hover:bg-danger/10 hover:text-danger transition-colors border-b border-border last:border-b-0 flex items-center justify-between"
                   >
-                    {f.displayName}
-                    <span className="text-text-dim ml-2">({f.totalItemCount})</span>
+                    <span>
+                      {rank ? <span className="text-danger mr-2">{i + 1}.</span> : null}
+                      {f.displayName}
+                    </span>
+                    <span className="flex items-center gap-2">
+                      {rank && <span className="text-danger/70 text-xs">{rank.count}x</span>}
+                      <span className="text-text-dim">{f.totalItemCount}</span>
+                    </span>
                   </button>
-                ))}
+                )
+              })}
             </div>
           )}
         </>
