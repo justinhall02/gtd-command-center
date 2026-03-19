@@ -17,6 +17,15 @@ interface Props {
   isQuoteEmail: boolean
 }
 
+// Strip inline color and background styles from email HTML so our dark theme shows through
+function sanitizeEmailHtml(html: string): string {
+  return html
+    .replace(/\bcolor\s*:\s*[^;!"]+(;|(?="))/gi, 'color: inherit;')
+    .replace(/\bbackground-color\s*:\s*[^;!"]+(;|(?="))/gi, 'background-color: transparent;')
+    .replace(/\bbackground\s*:\s*#[0-9a-fA-F]{3,8}(;|(?="))/gi, 'background: transparent;')
+    .replace(/\bbackground\s*:\s*rgb[^;"]+(;|(?="))/gi, 'background: transparent;')
+}
+
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime()
   const mins = Math.floor(diff / 60000)
@@ -80,9 +89,9 @@ export default function EmailCard({ email, suggestion, index, total, onAddTask, 
         {expanded && fullMessage?.body && (
           <div
             ref={emailBodyRef}
-            className="mt-3 pt-3 border-t border-border text-sm leading-relaxed overflow-y-auto [&_a]:text-accent [&_a]:underline [&_*]:!text-text/80 [&_h1]:!text-text [&_h2]:!text-text [&_h3]:!text-text [&_strong]:!text-text [&_b]:!text-text [&_td]:!text-text/70 [&_p]:!text-text/80 [&_li]:!text-text/80 [&_span]:!text-text/70 [&_div]:!text-text/70 [&_img]:max-w-full [&_table]:max-w-full [&_*]:!bg-transparent"
+            className="mt-3 pt-3 border-t border-border text-sm leading-relaxed overflow-y-auto email-body-override"
             style={{ maxHeight: 'calc(100vh - 380px)' }}
-            dangerouslySetInnerHTML={{ __html: fullMessage.body.content }}
+            dangerouslySetInnerHTML={{ __html: sanitizeEmailHtml(fullMessage.body.content) }}
           />
         )}
 

@@ -35,3 +35,27 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--color-text-dim);
 }
+
+/* Force email body content to use our dark theme colors */
+.email-body-override,
+.email-body-override * {
+  color: var(--color-text) !important;
+  background-color: transparent !important;
+}
+.email-body-override a {
+  color: var(--color-accent) !important;
+  text-decoration: underline;
+}
+.email-body-override h1,
+.email-body-override h2,
+.email-body-override h3,
+.email-body-override strong,
+.email-body-override b {
+  color: #ffffff !important;
+}
+.email-body-override img {
+  max-width: 100%;
+}
+.email-body-override table {
+  max-width: 100%;
+}
