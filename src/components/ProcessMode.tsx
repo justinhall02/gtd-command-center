@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import type { MailFolder, Suggestion } from '../types'
-import { useFolders, useMessages, processMessage, moveMessage } from '../hooks/useEmails'
+import { useFolders, useMessages, processMessage, moveMessage, reportToCoro } from '../hooks/useEmails'
 import { useTodoLists } from '../hooks/useTasks'
 import FolderPicker from './FolderPicker'
 import EmailCard from './EmailCard'
@@ -97,6 +97,16 @@ export default function ProcessMode() {
     advanceToNext()
   }
 
+  const handleReportCoro = async () => {
+    if (!currentEmail) return
+    await reportToCoro(currentEmail.id, 'suspicious', {
+      from: currentEmail.from.emailAddress.address,
+      subject: currentEmail.subject,
+      hasAttachments: currentEmail.hasAttachments,
+    })
+    advanceToNext()
+  }
+
   // Keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -104,6 +114,7 @@ export default function ProcessMode() {
       if (e.key === 't' || e.key === 'T') { e.preventDefault(); setShowTaskForm(true) }
       if (e.key === 'm' || e.key === 'M') { e.preventDefault(); setShowMoveMenu(!showMoveMenu); setShowMisrouteMenu(false) }
       if (e.key === 'r' || e.key === 'R') { e.preventDefault(); setShowMisrouteMenu(!showMisrouteMenu); setShowMoveMenu(false) }
+      if (e.key === 'c' || e.key === 'C') { e.preventDefault(); handleReportCoro() }
       if (e.key === 'd' || e.key === 'D') { e.preventDefault(); handleDelete() }
       if (e.key === 'ArrowRight' || e.key === 'j') { e.preventDefault(); handleSkip() }
     }
@@ -157,6 +168,7 @@ export default function ProcessMode() {
             onAddTask={() => setShowTaskForm(true)}
             onMove={() => { setShowMoveMenu(!showMoveMenu); setShowMisrouteMenu(false) }}
             onMisrouted={() => { setShowMisrouteMenu(!showMisrouteMenu); setShowMoveMenu(false) }}
+            onReportCoro={handleReportCoro}
             onArchive={handleDelete}
             onSkip={handleSkip}
           />
@@ -217,7 +229,7 @@ export default function ProcessMode() {
 
       {/* Keyboard shortcut hint */}
       <div className="mt-6 text-center text-text-dim text-xs opacity-50">
-        [T] add task · [M] move · [R] misrouted · [D] delete · [→] skip
+        [T] add task · [M] move · [R] misrouted · [C] coro · [D] delete · [→] skip
       </div>
     </div>
   )

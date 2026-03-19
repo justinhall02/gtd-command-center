@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import type { EmailMessage, Suggestion } from '../types'
 import { useFullMessage } from '../hooks/useEmails'
 
@@ -10,6 +10,7 @@ interface Props {
   onAddTask: () => void
   onMove: () => void
   onMisrouted: () => void
+  onReportCoro: () => void
   onArchive: () => void
   onSkip: () => void
 }
@@ -24,9 +25,20 @@ function timeAgo(dateStr: string): string {
   return `${days}d ago`
 }
 
-export default function EmailCard({ email, suggestion, index, total, onAddTask, onMove, onMisrouted, onArchive, onSkip }: Props) {
+export default function EmailCard({ email, suggestion, index, total, onAddTask, onMove, onMisrouted, onReportCoro, onArchive, onSkip }: Props) {
   const [expanded, setExpanded] = useState(false)
   const { message: fullMessage } = useFullMessage(expanded ? email.id : null)
+  const emailBodyRef = useRef<HTMLDivElement>(null)
+
+  // Force all links in email body to open in new window
+  useEffect(() => {
+    if (!emailBodyRef.current) return
+    const links = emailBodyRef.current.querySelectorAll('a')
+    links.forEach(link => {
+      link.setAttribute('target', '_blank')
+      link.setAttribute('rel', 'noopener noreferrer')
+    })
+  }, [fullMessage])
 
   return (
     <div className="border border-border bg-surface">
@@ -54,7 +66,8 @@ export default function EmailCard({ email, suggestion, index, total, onAddTask, 
         {/* Expanded full email */}
         {expanded && fullMessage?.body && (
           <div
-            className="mt-3 pt-3 border-t border-border text-xs text-text-dim leading-relaxed max-h-64 overflow-y-auto"
+            ref={emailBodyRef}
+            className="mt-3 pt-3 border-t border-border text-xs text-text-dim leading-relaxed max-h-64 overflow-y-auto [&_a]:text-accent [&_a]:underline"
             dangerouslySetInnerHTML={{ __html: fullMessage.body.content }}
           />
         )}
@@ -95,6 +108,12 @@ export default function EmailCard({ email, suggestion, index, total, onAddTask, 
           className="px-3 py-1.5 text-xs font-medium border border-danger/40 text-danger hover:bg-danger/10 transition-colors"
         >
           [R] Misrouted
+        </button>
+        <button
+          onClick={onReportCoro}
+          className="px-3 py-1.5 text-xs font-medium border border-warning/40 text-warning hover:bg-warning/10 transition-colors"
+        >
+          [C] Coro
         </button>
         <button
           onClick={onArchive}

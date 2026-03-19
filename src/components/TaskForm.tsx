@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import type { TodoList, EmailMessage } from '../types'
 import { createTask } from '../hooks/useTasks'
 
@@ -9,10 +9,60 @@ interface Props {
   onCancel: () => void
 }
 
+// Analyze email to suggest whether Claude can help
+function analyzeEmail(email: EmailMessage): { type: 'autonomous' | 'guided' | 'manual'; reason: string } {
+  const subject = (email.subject || '').toLowerCase()
+  const from = email.from.emailAddress.address.toLowerCase()
+  const preview = (email.bodyPreview || '').toLowerCase()
+  const all = `${subject} ${preview}`
+
+  // Things Claude can definitely do autonomously
+  if (/quote|pricing|proposal|estimate|bid/.test(all) && /cat6|cabling|install|network|low voltage|fiber/.test(all)) {
+    return { type: 'autonomous', reason: 'Looks like a quote request — Claude can draft via /create-quote' }
+  }
+  if (/follow.?up|check.?in|touching base|circling back/.test(all)) {
+    return { type: 'autonomous', reason: 'Follow-up email — Claude can draft a reply' }
+  }
+  if (/schedule|calendar|meeting|appointment|availability/.test(all)) {
+    return { type: 'autonomous', reason: 'Scheduling — Claude can check calendar and reply' }
+  }
+  if (/invoice|payment|billing|receipt|paid/.test(all)) {
+    return { type: 'guided', reason: 'Billing/invoice — Claude can help review but you should verify amounts' }
+  }
+  if (/hubspot|crm|deal|pipeline|contact/.test(all)) {
+    return { type: 'autonomous', reason: 'CRM task — Claude has HubSpot access' }
+  }
+  if (/wordpress|website|seo|plugin|css|page/.test(all)) {
+    return { type: 'autonomous', reason: 'Web/SEO task — Claude can make the changes' }
+  }
+  if (/review|approve|sign|contract|agreement|legal/.test(all)) {
+    return { type: 'guided', reason: 'Needs your review — Claude can prep but you decide' }
+  }
+
+  // Things Claude can guide you through
+  if (/call|phone|visit|in.?person|on.?site|walk.?through/.test(all)) {
+    return { type: 'manual', reason: 'Requires physical presence or a phone call' }
+  }
+  if (/password|login|credential|2fa|mfa/.test(all)) {
+    return { type: 'manual', reason: 'Security/credentials — you need to handle this directly' }
+  }
+
+  // Default: Claude can probably help somehow
+  return { type: 'guided', reason: 'Claude can help research and draft — review before sending' }
+}
+
 export default function TaskForm({ email, lists, onSaved, onCancel }: Props) {
+  const analysis = useMemo(() => analyzeEmail(email), [email])
+
+  // Default to "Tasks" list
+  const defaultListId = useMemo(() => {
+    const tasksList = lists.find(l => l.displayName === 'Tasks')
+    return tasksList?.id || ''
+  }, [lists])
+
   const [title, setTitle] = useState(email.subject || '')
-  const [selectedList, setSelectedList] = useState('')
-  const [claudeType, setClaudeType] = useState<'autonomous' | 'guided' | 'manual'>('autonomous')
+  const [selectedList, setSelectedList] = useState(defaultListId)
+  const [claudeType, setClaudeType] = useState<'autonomous' | 'guided' | 'manual'>(analysis.type)
   const [saving, setSaving] = useState(false)
 
   const handleSave = async () => {
@@ -44,6 +94,12 @@ export default function TaskForm({ email, lists, onSaved, onCancel }: Props) {
   return (
     <div className="border border-accent/30 bg-surface-hover px-4 py-3 mt-2">
       <div className="text-accent text-xs font-medium mb-3 tracking-wider">ADD TASK</div>
+
+      {/* Claude's suggestion */}
+      <div className="mb-3 px-3 py-2 border border-accent/20 bg-bg text-xs">
+        <span className="text-accent">Claude thinks:</span>{' '}
+        <span className="text-text-dim">{analysis.reason}</span>
+      </div>
 
       {/* List picker */}
       <div className="mb-3">
@@ -86,7 +142,7 @@ export default function TaskForm({ email, lists, onSaved, onCancel }: Props) {
               onClick={() => setClaudeType(value)}
               className={`px-3 py-1 text-xs font-medium transition-colors ${
                 claudeType === value
-                  ? 'bg-accent text-bg'
+                  ? value === 'autonomous' ? 'bg-accent text-bg' : value === 'guided' ? 'bg-warning text-bg' : 'bg-text-dim text-bg'
                   : 'border border-border text-text-dim hover:text-text'
               }`}
             >

@@ -91,3 +91,12 @@ export async function processMessage(messageId: string, action: string, destinat
   })
   return res.json()
 }
+
+export async function reportToCoro(messageId: string, reportAction: string, emailMeta?: any) {
+  const res = await fetch(`${API}/messages/${messageId}/report-coro`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action: reportAction, emailMeta }),
+  })
+  return res.json()
+}

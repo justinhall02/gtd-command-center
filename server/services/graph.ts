@@ -146,4 +146,14 @@ export const graph = {
       }),
     })
   },
+
+  async forwardMessage(messageId: string, toAddress: string, comment?: string) {
+    return graphCall(`/me/messages/${messageId}/forward`, {
+      method: 'POST',
+      body: JSON.stringify({
+        comment: comment || '',
+        toRecipients: [{ emailAddress: { address: toAddress } }],
+      }),
+    })
+  },
 }

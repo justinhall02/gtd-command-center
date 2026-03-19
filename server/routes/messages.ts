@@ -84,4 +84,39 @@ router.post('/:id/process', async (req, res) => {
   }
 })
 
+// Report to Coro (forward email as phishing/spam report)
+const CORO_REPORT_ADDRESS = process.env.CORO_REPORT_ADDRESS || 'report@coro.net'
+
+router.post('/:id/report-coro', async (req, res) => {
+  try {
+    const { action: reportAction, emailMeta } = req.body
+    const comment = `Reported as ${reportAction || 'suspicious'} via GTD Command Center`
+
+    // Forward email to Coro for analysis
+    await graph.forwardMessage(req.params.id, CORO_REPORT_ADDRESS, comment)
+
+    // Move to Deleted Items after reporting
+    const folders = await graph.listFolders()
+    const trash = folders.find((f: any) => f.displayName === 'Deleted Items')
+    if (trash) {
+      await graph.moveMessage(req.params.id, trash.id)
+    }
+
+    // Record in processed emails
+    db.prepare(`
+      INSERT OR REPLACE INTO processed_emails (email_id, action, destination)
+      VALUES (?, 'reported_coro', ?)
+    `).run(req.params.id, CORO_REPORT_ADDRESS)
+
+    // Record decision for learning
+    if (emailMeta) {
+      recordDecision('process', emailMeta, `report_coro:${reportAction || 'suspicious'}`)
+    }
+
+    res.json({ ok: true, reportedTo: CORO_REPORT_ADDRESS })
+  } catch (err: any) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
 export default router
