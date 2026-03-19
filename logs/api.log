@@ -6,3 +6,11 @@
 2026-03-19 18:01:42 [info]: STDIO transport started successfully
 2026-03-19 18:01:42 [info]: QBOMCP-TS Server started with STDIO transport
 2026-03-19 18:09:01 [info]: Shutting down STDIO transport
+2026-03-19 19:40:02 [info]: Starting QBOMCP-TS Server {"version":"2.0.0","transport":"stdio","environment":"development","features":{"cache":true,"retry":true,"healthCheck":true,"metrics":false}}
+2026-03-19 19:40:02 [info]: QuickBooks configuration validated {"environment":"production","companyId":"193514341991102"}
+2026-03-19 19:40:02 [info]: QBOMCP-TS Server initialized
+2026-03-19 19:40:02 [info]: Initializing STDIO transport
+2026-03-19 19:40:02 [info]: Starting STDIO transport
+2026-03-19 19:40:02 [info]: STDIO transport started successfully
+2026-03-19 19:40:02 [info]: QBOMCP-TS Server started with STDIO transport
+2026-03-19 19:40:05 [info]: Shutting down STDIO transport

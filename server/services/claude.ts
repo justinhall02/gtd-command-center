@@ -192,7 +192,8 @@ trap cleanup EXIT
 exec ${CLAUDE_BIN} --dangerously-skip-permissions --chrome --name "GTD Execute Session" --system-prompt "$SYSTEM_PROMPT" "$INITIAL_PROMPT"
 `, { mode: 0o755 })
 
-  const cmd = `cmd.exe /c start wt wsl -e bash ${launcherScript}`
+  // Use wt with explicit WSL command — wt new-tab runs in a new tab
+  const cmd = `cmd.exe /c start wt -w 0 new-tab wsl.exe --cd /mnt/c/Users/JustinHall/gtd-command-center -- bash ${launcherScript}`
 
   console.log(`[SESSION] Launching Claude session with ${tasks.length} tasks`)
 
