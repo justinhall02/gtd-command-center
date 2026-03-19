@@ -1,8 +1,8 @@
-import type { Mode } from '../types'
+import type { AppMode } from '../App'
 
 interface Props {
-  mode: Mode | 'home'
-  onModeChange: (mode: Mode | 'home') => void
+  mode: AppMode
+  onModeChange: (mode: AppMode) => void
   children: React.ReactNode
 }
 
@@ -37,7 +37,7 @@ export default function Layout({ mode, onModeChange, children }: Props) {
                 : 'text-text-dim hover:text-text hover:bg-surface'
             }`}
           >
-            PROCESS
+            INBOX
           </button>
           <button
             onClick={() => onModeChange('execute')}

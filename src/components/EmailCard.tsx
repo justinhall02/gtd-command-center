@@ -11,8 +11,10 @@ interface Props {
   onMove: () => void
   onMisrouted: () => void
   onReportCoro: () => void
+  onQuoteIt: () => void
   onArchive: () => void
   onSkip: () => void
+  isQuoteEmail: boolean
 }
 
 function timeAgo(dateStr: string): string {
@@ -25,7 +27,7 @@ function timeAgo(dateStr: string): string {
   return `${days}d ago`
 }
 
-export default function EmailCard({ email, suggestion, index, total, onAddTask, onMove, onMisrouted, onReportCoro, onArchive, onSkip }: Props) {
+export default function EmailCard({ email, suggestion, index, total, onAddTask, onMove, onMisrouted, onReportCoro, onQuoteIt, onArchive, onSkip, isQuoteEmail }: Props) {
   const [expanded, setExpanded] = useState(false)
   const { message: fullMessage } = useFullMessage(expanded ? email.id : null)
   const emailBodyRef = useRef<HTMLDivElement>(null)
@@ -90,7 +92,15 @@ export default function EmailCard({ email, suggestion, index, total, onAddTask, 
       )}
 
       {/* Action buttons */}
-      <div className="px-4 py-3 border-t border-border flex gap-2">
+      <div className="px-4 py-3 border-t border-border flex gap-2 flex-wrap">
+        {isQuoteEmail && (
+          <button
+            onClick={onQuoteIt}
+            className="px-3 py-1.5 text-xs font-bold bg-success text-bg hover:opacity-80 transition-colors animate-pulse"
+          >
+            [Q] Quote It
+          </button>
+        )}
         <button
           onClick={onAddTask}
           className="px-3 py-1.5 text-xs font-medium bg-accent text-bg hover:bg-accent-dim transition-colors"

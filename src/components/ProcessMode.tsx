@@ -6,10 +6,14 @@ import FolderPicker from './FolderPicker'
 import EmailCard from './EmailCard'
 import TaskForm from './TaskForm'
 
-export default function ProcessMode() {
+interface Props {
+  initialFolderId?: string | null
+}
+
+export default function ProcessMode({ initialFolderId }: Props) {
   const { folders, childFolders, loadChildren, loading: foldersLoading } = useFolders()
   const { lists } = useTodoLists()
-  const [selectedFolder, setSelectedFolder] = useState<string | null>(null)
+  const [selectedFolder, setSelectedFolder] = useState<string | null>(initialFolderId || null)
   const [allFolders, setAllFolders] = useState<MailFolder[]>([])
   const { messages, loading: msgsLoading, refresh } = useMessages(selectedFolder)
   const [currentIndex, setCurrentIndex] = useState(0)
@@ -30,15 +34,19 @@ export default function ProcessMode() {
     }
   }, [folders, loadChildren])
 
-  // Auto-select "3: Today" (Now folder) or Inbox
+  // Auto-select: use initialFolderId if provided, else "3: Today", else Inbox
   useEffect(() => {
     if (!selectedFolder && allFolders.length > 0) {
-      const today = allFolders.find(f => f.displayName === '3: Today')
-      const inbox = allFolders.find(f => f.displayName === 'Inbox')
-      const target = today || inbox
-      if (target) setSelectedFolder(target.id)
+      if (initialFolderId) {
+        setSelectedFolder(initialFolderId)
+      } else {
+        const today = allFolders.find(f => f.displayName === '3: Today')
+        const inbox = allFolders.find(f => f.displayName === 'Inbox')
+        const target = today || inbox
+        if (target) setSelectedFolder(target.id)
+      }
     }
-  }, [allFolders, selectedFolder])
+  }, [allFolders, selectedFolder, initialFolderId])
 
   const currentEmail = messages[currentIndex]
 
@@ -107,10 +115,49 @@ export default function ProcessMode() {
     advanceToNext()
   }
 
+  // Detect quote-related emails
+  const isQuoteEmail = currentEmail ? (() => {
+    const all = `${currentEmail.subject} ${currentEmail.bodyPreview}`.toLowerCase()
+    return /quote|pricing|proposal|estimate|bid|rfp|install|cabling|cat6|network|low voltage|fiber/.test(all)
+  })() : false
+
+  const handleQuoteIt = async () => {
+    if (!currentEmail) return
+    // Queue a command for Claude Code to run /create-quote
+    const res = await fetch('/api/tasks', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: `Quote: ${currentEmail.subject}`,
+        body: currentEmail.bodyPreview,
+        claude_type: 'autonomous',
+        claude_action: JSON.stringify({
+          skill: '/create-quote',
+          source_email: currentEmail.id,
+          from: currentEmail.from.emailAddress.address,
+          subject: currentEmail.subject,
+        }),
+        source_email_id: currentEmail.id,
+        source_email_subject: currentEmail.subject,
+        source_email_from: currentEmail.from.emailAddress.address,
+        emailMeta: {
+          from: currentEmail.from.emailAddress.address,
+          subject: currentEmail.subject,
+          hasAttachments: currentEmail.hasAttachments,
+        },
+      }),
+    })
+    const task = await res.json()
+    // Immediately queue for execution
+    await fetch(`/api/tasks/${task.id}/queue`, { method: 'POST' })
+    advanceToNext()
+  }
+
   // Keyboard shortcuts
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (showTaskForm) return // Don't capture when typing
+      if (e.key === 'q' || e.key === 'Q') { e.preventDefault(); if (isQuoteEmail) handleQuoteIt() }
       if (e.key === 't' || e.key === 'T') { e.preventDefault(); setShowTaskForm(true) }
       if (e.key === 'm' || e.key === 'M') { e.preventDefault(); setShowMoveMenu(!showMoveMenu); setShowMisrouteMenu(false) }
       if (e.key === 'r' || e.key === 'R') { e.preventDefault(); setShowMisrouteMenu(!showMisrouteMenu); setShowMoveMenu(false) }
@@ -169,8 +216,10 @@ export default function ProcessMode() {
             onMove={() => { setShowMoveMenu(!showMoveMenu); setShowMisrouteMenu(false) }}
             onMisrouted={() => { setShowMisrouteMenu(!showMisrouteMenu); setShowMoveMenu(false) }}
             onReportCoro={handleReportCoro}
+            onQuoteIt={handleQuoteIt}
             onArchive={handleDelete}
             onSkip={handleSkip}
+            isQuoteEmail={isQuoteEmail}
           />
 
           {/* Task form */}
@@ -229,7 +278,7 @@ export default function ProcessMode() {
 
       {/* Keyboard shortcut hint */}
       <div className="mt-6 text-center text-text-dim text-xs opacity-50">
-        [T] add task · [M] move · [R] misrouted · [C] coro · [D] delete · [→] skip
+        [Q] quote it · [T] add task · [M] move · [R] misrouted · [C] coro · [D] delete · [→] skip
       </div>
     </div>
   )
